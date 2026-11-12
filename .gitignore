@@ -1,0 +1,29 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# environment
+.env
+.env.*
+!.env.example
+
+# testing
+/coverage
+/playwright-report
+/test-results
+
+# misc
+.DS_Store
+Thumbs.db
+npm-debug.log*
+.vercel
+
+# raw source assets (unoptimised originals; web-ready copies live in /public)
+/ALL FOOTBALL/
+/LOGO/
+/OUR COMPANY FACTORY/

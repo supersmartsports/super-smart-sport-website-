@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+/*
+ * SUPER SMART SPORTS design system.
+ * Navy carries the brand, red is reserved for action and emphasis,
+ * white and the light grey give the navy room to breathe.
+ */
+@theme {
+  /* Colour */
+  --color-navy: #080e65;
+  --color-navy-deep: #070b35;
+  --color-navy-ink: #04061f;
+  --color-red: #ed101a;
+  --color-red-deep: #c50c15;
+  --color-white: #ffffff;
+  --color-paper: #f4f5f7;
+  --color-line: #d9dbe6;
+  --color-slate: #565b7e;
+
+  /* Type: one variable family. Display text uses the condensed end of the width axis. */
+  --font-sans: var(--font-archivo), "Arial Narrow", Arial, sans-serif;
+
+  --text-display: clamp(2.4rem, 11.4vw, 5.5rem);
+  --text-display-wide: clamp(5rem, 7.1vw, 8.25rem);
+  --text-h1: clamp(2.5rem, 6vw, 5.5rem);
+  --text-h2: clamp(2.125rem, 4.4vw, 4rem);
+  --text-h3: clamp(1.5rem, 2.2vw, 2rem);
+  --text-lead: clamp(1.0625rem, 1.3vw, 1.3125rem);
+
+  /* Shape: tight corners. These are engineered products, not app cards. */
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 6px;
+
+  /* Depth: one working shadow for raised surfaces, one for overlays. */
+  --shadow-raised: 0 1px 0 rgb(7 11 53 / 0.04), 0 18px 40px -24px rgb(7 11 53 / 0.35);
+  --shadow-overlay: 0 30px 80px -30px rgb(4 6 31 / 0.6);
+
+  /* Motion */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --breakpoint-3xl: 112rem;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--color-navy-deep);
+    color: var(--color-navy-deep);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: clip;
+  }
+
+  ::selection {
+    background: var(--color-red);
+    color: var(--color-white);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-red);
+    outline-offset: 3px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* On red surfaces the red ring disappears, so switch to white. */
+  .focus-light:focus-visible,
+  .on-red :focus-visible {
+    outline-color: var(--color-white);
+  }
+}
+
+@layer components {
+  /* Display type: condensed, heavy, uppercase. The voice of the brand. */
+  .type-display,
+  .type-h1,
+  .type-h2,
+  .type-h3 {
+    font-stretch: 68%;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -0.012em;
+    text-wrap: balance;
+  }
+  .type-display {
+    font-size: var(--text-display);
+    line-height: 0.86;
+    font-stretch: 62%;
+    font-weight: 900;
+  }
+  @media (min-width: 64rem) {
+    .type-display {
+      font-size: var(--text-display-wide);
+    }
+  }
+  .type-h1 {
+    font-size: var(--text-h1);
+    line-height: 0.9;
+    font-stretch: 62%;
+    font-weight: 900;
+  }
+  .type-h2 {
+    font-size: var(--text-h2);
+    line-height: 0.94;
+  }
+  .type-h3 {
+    font-size: var(--text-h3);
+    line-height: 1;
+    font-stretch: 75%;
+    font-weight: 700;
+  }
+  .type-lead {
+    font-size: var(--text-lead);
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+  /* Small condensed label used for specification names and form labels. */
+  .type-label {
+    font-stretch: 80%;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .shell {
+    width: 100%;
+    max-width: 96rem;
+    margin-inline: auto;
+    padding-inline: clamp(1.25rem, 4vw, 4rem);
+  }
+
+  .section {
+    padding-block: clamp(4.5rem, 9vw, 9rem);
+  }
+
+  /* The seam: a stitched rule used where one stage hands over to the next. */
+  .seam {
+    height: 2px;
+    background-image: linear-gradient(to right, currentColor 0 60%, transparent 60% 100%);
+    background-size: 14px 2px;
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
