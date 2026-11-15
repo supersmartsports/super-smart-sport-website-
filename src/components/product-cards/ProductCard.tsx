@@ -51,9 +51,7 @@ export function ProductCard({ product, rating, headingLevel: Heading = "h3", pos
           </p>
         )}
 
-        <p className="mt-3 text-[0.9375rem] leading-relaxed text-slate">{product.description}</p>
-
-        <dl className="mt-5 grid grid-cols-2 border-t border-line text-sm">
+                <dl className="mt-5 grid grid-cols-2 border-t border-line text-sm">
           <div className="border-b border-line py-3 pr-3">
             <dt className="type-label text-slate">Construction</dt>
             <dd className="mt-0.5 font-semibold text-navy-deep">{product.construction ?? "To your specification"}</dd>
@@ -66,7 +64,7 @@ export function ProductCard({ product, rating, headingLevel: Heading = "h3", pos
 
         <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-navy">
           <span aria-hidden className="size-1.5 rounded-full bg-red" />
-          Custom manufactured to order
+          Made to order
         </p>
 
         <div className="mt-auto grid gap-2 pt-6 min-[420px]:grid-cols-2">

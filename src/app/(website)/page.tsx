@@ -33,17 +33,9 @@ export default function HomePage() {
         <div className="shell grid gap-12 lg:grid-cols-12 lg:gap-16">
           <div className="lg:col-span-7">
             <h2 className="type-h2 text-navy-deep">We do not sell footballs off a shelf. We manufacture yours.</h2>
-            <div className="type-lead mt-7 grid max-w-[60ch] gap-5 text-slate">
-              <p>
-                {site.name} is a football manufacturer. Brands, clubs, academies and distributors send us their
-                requirements, and we produce footballs to that specification: their logo, their colours, their choice of
-                panel design, material and construction.
-              </p>
-              <p>
-                Nothing here is ready-made stock. The footballs on this site are designs we have developed, shown so you
-                can see what is possible before you brief us on your own.
-              </p>
-            </div>
+            <p className="type-lead mt-7 max-w-[44ch] text-slate">
+              Your logo, colours, panels, material and construction. Nothing ready-made.
+            </p>
             <Link href={routes.about} className={`${textLink} mt-8 inline-block text-navy`}>
               About {site.name}
             </Link>
@@ -59,7 +51,7 @@ export default function HomePage() {
                   className="object-cover"
                 />
               </div>
-              <figcaption className="mt-3 text-sm text-slate">{site.name}, sports goods manufacturing and exports.</figcaption>
+              <figcaption className="mt-3 text-sm text-slate">{site.name}</figcaption>
             </figure>
           </Reveal>
         </div>
@@ -70,7 +62,7 @@ export default function HomePage() {
         <div className="shell">
           <SectionHeading
             title="Footballs from our collection"
-            lead={`${products.length} original designs, each one a starting point. Hover or tap a football to turn it in 3D, then ask for it in your own colours and branding.`}
+            lead={`${products.length} designs. Drag any football to turn it.`}
             action={
               <ButtonLink href={routes.products} variant="outline-dark">
                 View all {products.length} footballs
@@ -92,8 +84,7 @@ export default function HomePage() {
         <div className="shell">
           <SectionHeading
             tone="dark"
-            title="Construction built around the panel"
-            lead="The panel configuration shapes how a football looks and how your artwork sits on it. These are the three we have modelled; tell us if you need another."
+            title="Built around the panel"
           />
           <ul className="mt-14 grid gap-px overflow-hidden rounded-sm bg-white/15 md:grid-cols-3">
             {constructionTypes.map(({ slug, panels, text }) => {
@@ -122,16 +113,12 @@ export default function HomePage() {
             <LiveFootball slug="32-panel-4" posterSizes="(min-width: 1024px) 36rem, 100vw" />
           </div>
           <div>
-            <h2 className="type-h2">Materials and surface, specified by you</h2>
-            <p className="type-lead mt-6 max-w-[54ch] text-white/75">
-              The surface is what a player feels first. Every football in our collection is modelled with a PU surface
-              and a textured finish, and each order is specified individually.
-            </p>
+            <h2 className="type-h2">Material and surface</h2>
             <dl className="mt-9 border-t border-white/20">
               {[
-                ["Surface material", "PU on every football shown. Tell us if your specification calls for another material."],
-                ["Surface texture", "The finish of the outer surface, chosen to suit the type of football."],
-                ["Print", "Your graphics are printed on the panels and checked against your artwork."],
+                ["Material", "PU, as modelled"],
+                ["Finish", "Textured"],
+                ["Print", "Your artwork"],
               ].map(([term, detail]) => (
                 <div key={term} className="grid gap-1 border-b border-white/20 py-5 sm:grid-cols-[11rem_1fr] sm:gap-6">
                   <dt className="type-label pt-1 text-white/60">{term}</dt>
@@ -147,8 +134,7 @@ export default function HomePage() {
       <section className="section bg-paper">
         <div className="shell">
           <SectionHeading
-            title="Six decisions that make it your football"
-            lead="Everything about the football is open to your specification."
+            title="Make it yours"
             action={
               <ButtonLink href={routes.customization} variant="dark">
                 Customize Your Football
@@ -172,8 +158,7 @@ export default function HomePage() {
           <div className="lg:col-span-4">
             <div className="lg:sticky lg:top-32">
               <h2 className="type-h2 text-navy-deep">From brief to finished football</h2>
-              <p className="type-lead mt-6 text-slate">Eight stages take your specification from an idea to a packed order.</p>
-              <ButtonLink href={routes.manufacturing} variant="outline-dark" className="mt-8">
+                            <ButtonLink href={routes.manufacturing} variant="outline-dark" className="mt-8">
                 See how we manufacture
               </ButtonLink>
             </div>
@@ -200,7 +185,6 @@ export default function HomePage() {
           <SectionHeading
             tone="dark"
             title="Checked before it leaves us"
-            lead="Quality is decided at the factory. These are the things we look at on every order."
             action={
               <ButtonLink href={routes.quality} variant="outline-light">
                 Our approach to quality
@@ -223,16 +207,13 @@ export default function HomePage() {
         <div className="shell grid gap-12 lg:grid-cols-2 lg:gap-20">
           <div>
             <h2 className="type-h2 text-navy-deep">Manufactured in Pakistan, exported to your market</h2>
-            <p className="type-lead mt-6 max-w-[54ch] text-slate">
-              We work with buyers outside Pakistan as a matter of course. You deal directly with the manufacturer, in
-              English, over WhatsApp or email.
-            </p>
+            <p className="type-lead mt-6 max-w-[40ch] text-slate">Direct from the manufacturer, by WhatsApp or email.</p>
           </div>
           <ul className="border-t border-line">
             {[
-              ["Private label", "Footballs produced under your brand, with your logo and packaging requirements."],
-              ["Bulk orders", "Production planned around the quantity you need."],
-              ["Direct communication", "One conversation with the people who make your footballs."],
+              ["Private label", "Under your brand."],
+              ["Bulk orders", "Planned around your quantity."],
+              ["Direct contact", "Talk to the people who make them."],
             ].map(([title, text]) => (
               <li key={title} className="grid gap-1 border-b border-line py-6 sm:grid-cols-[12rem_1fr] sm:gap-6">
                 <h3 className="type-h3 text-navy">{title}</h3>

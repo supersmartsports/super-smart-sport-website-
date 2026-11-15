@@ -5,13 +5,16 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { ContactShadows, Environment, Lightformer, useGLTF } from "@react-three/drei";
 import {
   Box3,
+  BufferAttribute,
+  BufferGeometry,
   Color,
+  DoubleSide,
+  Group,
+  Material,
+  Mesh,
   NeutralToneMapping,
+  Object3D,
   Vector3,
-  type Group,
-  type Material,
-  type Mesh,
-  type Object3D,
   type Texture,
 } from "three";
 
@@ -26,9 +29,24 @@ export type RotationState = {
 /** Indicative colour preview: swaps the navy and red of the original artwork. */
 export type Recolor = { primary: string; secondary: string };
 
+/** A point on the canvas as a fraction of its width and height (0 to 1, from the top left). */
+export type Anchor = { x: number; y: number };
+
 export type FootballSceneProps = {
   modelUrl: string;
   recolor?: Recolor | null;
+  /**
+   * 0 to 1, read every frame. Above 0 the ball comes apart: every panel flies outward
+   * and the layers inside (foam cushion, lining, bladder) are revealed.
+   */
+  explode?: RefObject<number>;
+  /**
+   * Filled every frame while the ball is open with the screen position of one point on
+   * each layer, in order: outer shell, foam cushion, lining, bladder. Used for labels.
+   */
+  anchors?: RefObject<Anchor[]>;
+  /** Canvas size relative to the ball's area; the camera backs away by this factor. */
+  frame?: number;
   rotation: RefObject<RotationState>;
   /** Radians per second. 0 disables idle rotation (reduced motion). */
   autoRotateSpeed?: number;
@@ -42,14 +60,7 @@ export type FootballSceneProps = {
   onReady?: () => void;
 };
 
-const textureSlots = [
-  "map",
-  "normalMap",
-  "roughnessMap",
-  "metalnessMap",
-  "aoMap",
-  "clearcoatNormalMap",
-] as const;
+const textureSlots = ["map", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "clearcoatNormalMap"] as const;
 
 const RECOLOR_UNIFORMS = "uniform vec3 uPrimary; uniform vec3 uSecondary; uniform float uRecolor;";
 const RECOLOR_GLSL = /* glsl */ `
@@ -72,13 +83,166 @@ function forEachMaterial(root: Object3D, visit: (material: Material) => void) {
   });
 }
 
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const smooth = (from: number, to: number, value: number) => {
+  const x = clamp01((value - from) / (to - from));
+  return x * x * (3 - 2 * x);
+};
+
+/** Splits a mesh into its separate connected pieces. In these models, every panel is one piece. */
+function splitGeometry(source: BufferGeometry): BufferGeometry[] {
+  const index = source.index;
+  const count = source.getAttribute("position").count;
+  if (!index) return [source.clone()];
+  const triangles = index.array;
+
+  const parent = new Int32Array(count);
+  for (let i = 0; i < count; i += 1) parent[i] = i;
+  const find = (a: number) => {
+    while (parent[a] !== a) {
+      parent[a] = parent[parent[a]];
+      a = parent[a];
+    }
+    return a;
+  };
+  for (let i = 0; i < triangles.length; i += 3) {
+    const root = find(triangles[i]);
+    for (let k = 1; k < 3; k += 1) {
+      const other = find(triangles[i + k]);
+      if (other !== root) parent[other] = root;
+    }
+  }
+
+  const groups = new Map<number, number[]>();
+  for (let i = 0; i < triangles.length; i += 3) {
+    const key = find(triangles[i]);
+    const list = groups.get(key);
+    if (list) list.push(i);
+    else groups.set(key, [i]);
+  }
+
+  const names = Object.keys(source.attributes);
+  const remap = new Int32Array(count);
+  const pieces: BufferGeometry[] = [];
+  for (const starts of groups.values()) {
+    remap.fill(-1);
+    const order: number[] = [];
+    const newIndex: number[] = [];
+    for (const start of starts) {
+      for (let k = 0; k < 3; k += 1) {
+        const vertex = triangles[start + k];
+        if (remap[vertex] < 0) {
+          remap[vertex] = order.length;
+          order.push(vertex);
+        }
+        newIndex.push(remap[vertex]);
+      }
+    }
+    const geometry = new BufferGeometry();
+    for (const name of names) {
+      const attribute = source.getAttribute(name);
+      const size = attribute.itemSize;
+      const data = new Float32Array(order.length * size);
+      for (let j = 0; j < order.length; j += 1) {
+        const v = order[j];
+        data[j * size] = attribute.getX(v);
+        if (size > 1) data[j * size + 1] = attribute.getY(v);
+        if (size > 2) data[j * size + 2] = attribute.getZ(v);
+        if (size > 3) data[j * size + 3] = attribute.getW(v);
+      }
+      geometry.setAttribute(name, new BufferAttribute(data, size));
+    }
+    geometry.setIndex(newIndex);
+    pieces.push(geometry);
+  }
+  return pieces;
+}
+
+type Piece = { mesh: Mesh; direction: Vector3; reach: number };
+
+/**
+ * Rebuilds the football as one mesh per panel, in the same place and with the same
+ * materials, so it looks identical closed and each panel can fly away when opened.
+ */
+function buildPanels(scene: Object3D, centre: Vector3) {
+  scene.updateMatrixWorld(true);
+  const root = new Group();
+  const pieces: Piece[] = [];
+  const materials = new Map<Material, Material>();
+  const geometries: BufferGeometry[] = [];
+
+  scene.traverse((child) => {
+    const mesh = child as Mesh;
+    if (!mesh.isMesh) return;
+    const original = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    let material = materials.get(original);
+    if (!material) {
+      material = original.clone();
+      // Panels are thin shells: their inside shows once they fly apart.
+      material.side = DoubleSide;
+      materials.set(original, material);
+    }
+    for (const geometry of splitGeometry(mesh.geometry)) {
+      geometry.applyMatrix4(mesh.matrixWorld);
+      geometries.push(geometry);
+      const positions = geometry.getAttribute("position");
+      const centroid = new Vector3();
+      for (let i = 0; i < positions.count; i += 1) {
+        centroid.x += positions.getX(i);
+        centroid.y += positions.getY(i);
+        centroid.z += positions.getZ(i);
+      }
+      centroid.divideScalar(positions.count);
+
+      const piece = new Mesh(geometry, material);
+      piece.userData.centroid = centroid;
+      root.add(piece);
+      const direction = centroid.clone().add(centre);
+      pieces.push({ mesh: piece, direction, reach: 0 });
+    }
+  });
+
+  pieces.forEach((piece, index) => {
+    // Panels slide out sideways, mostly in the plane the camera sees, so the ones on the
+    // near side do not hide the layers inside.
+    const d = piece.direction.normalize();
+    const flat = new Vector3(d.x, d.y, d.z * 0.45);
+    if (Math.hypot(flat.x, flat.y) < 0.4) {
+      const angle = index * 2.399963;
+      flat.set(Math.cos(angle) * 0.9, Math.sin(angle) * 0.9, d.z * 0.45);
+    }
+    const lateral = Math.min(1, Math.hypot(flat.x, flat.y));
+    piece.direction = flat.normalize();
+    // Panels near the middle of the view travel furthest, so they clear the layers behind them.
+    piece.reach = 0.95 + 0.6 * (1 - lateral) + 0.3 * ((index * 0.6180339) % 1);
+  });
+
+  // The panel the first label points at: the upper right one.
+  let outer = pieces[0];
+  let best = -Infinity;
+  for (const piece of pieces) {
+    const score = piece.direction.x * 0.6 + piece.direction.y * 0.5;
+    if (score > best) {
+      best = score;
+      outer = piece;
+    }
+  }
+  const outerAnchor = new Object3D();
+  outerAnchor.position.copy(outer.mesh.userData.centroid as Vector3);
+  outer.mesh.add(outerAnchor);
+
+  return { root, pieces, outerAnchor, materials: [...materials.values()], geometries };
+}
+
 function Football({
   modelUrl,
   recolor,
+  explode,
+  anchors,
   rotation,
   autoRotateSpeed,
   onReady,
-}: Pick<FootballSceneProps, "modelUrl" | "recolor" | "rotation" | "autoRotateSpeed" | "onReady">) {
+}: Pick<FootballSceneProps, "modelUrl" | "recolor" | "explode" | "anchors" | "rotation" | "autoRotateSpeed" | "onReady">) {
   // Draco off, Meshopt on: the web-ready models are Meshopt-compressed.
   const { scene } = useGLTF(modelUrl, false, true);
   const group = useRef<Group>(null);
@@ -120,10 +284,8 @@ function Football({
       material.onBeforeCompile = (shader) => {
         Object.assign(shader.uniforms, recolorUniforms);
         shader.fragmentShader = shader.fragmentShader
-          .replace("void main() {", `${RECOLOR_UNIFORMS}
-void main() {`)
-          .replace("#include <map_fragment>", `#include <map_fragment>
-${RECOLOR_GLSL}`);
+          .replace("void main() {", `${RECOLOR_UNIFORMS}\nvoid main() {`)
+          .replace("#include <map_fragment>", `#include <map_fragment>\n${RECOLOR_GLSL}`);
       };
       material.customProgramCacheKey = () => "sss-recolor";
       material.needsUpdate = true;
@@ -137,6 +299,27 @@ ${RECOLOR_GLSL}`);
       recolorUniforms.uSecondary.value.set(recolor.secondary);
     }
   }, [recolor, recolorUniforms]);
+
+  // Exploded view: only built for viewers that ask for it.
+  const canExplode = explode != null;
+  const rig = useMemo(() => (canExplode ? buildPanels(scene, offset) : null), [canExplode, scene, offset]);
+
+  useEffect(() => {
+    if (!rig) return;
+    return () => {
+      rig.geometries.forEach((geometry) => geometry.dispose());
+      rig.materials.forEach((material) => material.dispose());
+    };
+  }, [rig]);
+
+  const foamTop = useRef<Mesh>(null);
+  const foamBottom = useRef<Mesh>(null);
+  const liningTop = useRef<Mesh>(null);
+  const liningBottom = useRef<Mesh>(null);
+  const core = useRef<Group>(null);
+  const anchorObjects = useRef<(Object3D | null)[]>([null, null, null, null]);
+  const opened = useRef(0);
+  const probe = useMemo(() => new Vector3(), []);
 
   // Release GPU memory when the viewer goes away. The file itself stays in the
   // browser's HTTP cache, so showing the model again is fast.
@@ -156,18 +339,100 @@ ${RECOLOR_GLSL}`);
     };
   }, [scene, modelUrl]);
 
-  useFrame((_, delta) => {
-    const state = rotation.current;
+  useFrame((state, delta) => {
+    const spin = rotation.current;
     const node = group.current;
-    if (!state || !node) return;
+    if (!spin || !node) return;
     const dt = Math.min(delta, 0.05);
-    if (!state.dragging) {
-      state.yaw += (autoRotateSpeed ?? 0) * dt + state.velocity * dt;
-      state.velocity *= Math.pow(0.04, dt); // drag inertia fades in about a second
+    if (!spin.dragging) {
+      spin.yaw += (autoRotateSpeed ?? 0) * dt + spin.velocity * dt;
+      spin.velocity *= Math.pow(0.04, dt); // drag inertia fades in about a second
     }
-    node.rotation.y = state.yaw;
-    node.rotation.x += (state.pitch - node.rotation.x) * Math.min(1, dt * 10);
+
+    // Ease towards the requested opening so scroll jumps never snap the pieces.
+    const target = rig ? clamp01(explode?.current ?? 0) : 0;
+    opened.current += (target - opened.current) * Math.min(1, dt * 7);
+    const e = opened.current < 0.001 ? 0 : opened.current;
+
+    // The open ball faces the camera, so the layers inside can be read.
+    // Scrolling the page turns every football, on top of its own slow spin and any drag.
+    const total = spin.yaw + window.scrollY * 0.0045;
+    const wrapped = ((((total + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) - Math.PI;
+    node.rotation.y = wrapped * (1 - e);
+    node.rotation.x += (spin.pitch * (1 - e) - node.rotation.x) * Math.min(1, dt * 10);
+    if (!rig) return;
+
+    // Narrow screens get a tighter spread so the open ball stays on screen.
+    const spread = Math.min(1, Math.max(0.5, window.innerWidth / 1000));
+    const panelsOut = smooth(0, 0.55, e);
+    const layersOut = smooth(0.55, 1, e);
+    node.scale.setScalar(1 - 0.1 * e);
+
+    for (const piece of rig.pieces) {
+      piece.mesh.position.copy(piece.direction).multiplyScalar((piece.reach * panelsOut * spread) / scale);
+    }
+    // The inside only appears once the panels have cleared it, so nothing pokes through.
+    if (core.current) core.current.visible = panelsOut > 0.22;
+    if (foamTop.current) foamTop.current.position.y = 0.6 * layersOut;
+    if (foamBottom.current) foamBottom.current.position.y = -0.6 * layersOut;
+    if (liningTop.current) liningTop.current.position.y = 0.3 * layersOut;
+    if (liningBottom.current) liningBottom.current.position.y = -0.3 * layersOut;
+
+    const list = anchors?.current;
+    if (list && e > 0.02) {
+      node.updateMatrixWorld(true);
+      anchorObjects.current[0] = rig.outerAnchor;
+      anchorObjects.current.forEach((object, index) => {
+        if (!object || !list[index]) return;
+        object.getWorldPosition(probe);
+        probe.project(state.camera);
+        list[index].x = (probe.x + 1) / 2;
+        list[index].y = (1 - probe.y) / 2;
+      });
+    }
   });
+
+  if (rig) {
+    return (
+      <group ref={group}>
+        <group scale={scale}>
+          <primitive object={rig.root} position={offset} />
+        </group>
+        <group ref={core} visible={false}>
+          {/* foam cushion */}
+          <mesh ref={foamTop}>
+            <sphereGeometry args={[0.88, 56, 28, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <meshStandardMaterial color="#efe7d2" roughness={0.92} side={DoubleSide} />
+            <object3D ref={(object) => void (anchorObjects.current[1] = object)} position={[0.76, 0.42, 0.1]} />
+          </mesh>
+          <mesh ref={foamBottom}>
+            <sphereGeometry args={[0.88, 56, 28, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+            <meshStandardMaterial color="#efe7d2" roughness={0.92} side={DoubleSide} />
+          </mesh>
+          {/* lining */}
+          <mesh ref={liningTop}>
+            <sphereGeometry args={[0.78, 56, 28, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <meshStandardMaterial color="#6f83bd" roughness={0.8} side={DoubleSide} />
+            <object3D ref={(object) => void (anchorObjects.current[2] = object)} position={[0.68, 0.36, 0.1]} />
+          </mesh>
+          <mesh ref={liningBottom}>
+            <sphereGeometry args={[0.78, 56, 28, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+            <meshStandardMaterial color="#6f83bd" roughness={0.8} side={DoubleSide} />
+          </mesh>
+          {/* bladder */}
+          <mesh>
+            <sphereGeometry args={[0.64, 64, 40]} />
+            <meshPhysicalMaterial color="#09090d" roughness={0.18} clearcoat={1} clearcoatRoughness={0.1} />
+            <object3D ref={(object) => void (anchorObjects.current[3] = object)} position={[0.56, 0.06, 0.2]} />
+          </mesh>
+          <mesh position={[0.18, 0.61, 0.12]}>
+            <sphereGeometry args={[0.035, 16, 12]} />
+            <meshBasicMaterial color="#4f7dff" toneMapped={false} />
+          </mesh>
+        </group>
+      </group>
+    );
+  }
 
   return (
     <group ref={group}>
@@ -211,8 +476,11 @@ function StudioLighting() {
 export default function FootballScene({
   modelUrl,
   recolor = null,
+  explode,
+  anchors,
+  frame = 1,
   rotation,
-  autoRotateSpeed = 0.35,
+  autoRotateSpeed = 0.5,
   active = true,
   shadow = true,
   lowPower = false,
@@ -222,8 +490,8 @@ export default function FootballScene({
   return (
     <Canvas
       frameloop={active ? "always" : "never"}
-      dpr={[1, lowPower ? 1.5 : 2]}
-      camera={{ fov: 26, position: [0, 0.12, 5.6], near: 0.1, far: 30 }}
+      dpr={[1, frame > 1 ? 1.5 : lowPower ? 1.5 : 2]}
+      camera={{ fov: 26, position: [0, 0, 5.6 * frame], near: 0.1, far: 30 * frame }}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance", preserveDrawingBuffer }}
       onCreated={({ gl }) => {
         gl.toneMapping = NeutralToneMapping;
@@ -233,7 +501,15 @@ export default function FootballScene({
     >
       <ResumeLoop active={active} />
       <StudioLighting />
-      <Football modelUrl={modelUrl} recolor={recolor} rotation={rotation} autoRotateSpeed={autoRotateSpeed} onReady={onReady} />
+      <Football
+        modelUrl={modelUrl}
+        recolor={recolor}
+        explode={explode}
+        anchors={anchors}
+        rotation={rotation}
+        autoRotateSpeed={autoRotateSpeed}
+        onReady={onReady}
+      />
       {shadow && (
         // A sphere's contact shadow never changes as it spins, so render it once.
         <ContactShadows

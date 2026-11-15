@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type RefObject,
   type PointerEvent,
   type ReactNode,
 } from "react";
@@ -16,7 +17,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useReducedMotion } from "motion/react";
 import { useViewerSlot } from "@/features/3d-football/active-viewer";
-import type { Recolor, RotationState } from "./FootballScene";
+import type { Anchor, Recolor, RotationState } from "./FootballScene";
 
 // Three.js is only downloaded when a viewer is actually shown.
 const FootballScene = dynamic(() => import("./FootballScene"), { ssr: false });
@@ -58,6 +59,15 @@ export type FootballViewerProps = {
   autoRotate?: boolean;
   /** Indicative colour preview for the customization studio. */
   recolor?: Recolor | null;
+  /** 0 to 1, read every frame: opens the ball into its layers. */
+  explode?: RefObject<number>;
+  /** Screen positions of the ball's layers while it is open, for labels. */
+  anchors?: RefObject<Anchor[]>;
+  /**
+   * Makes the canvas this many times larger than the ball's area (the ball keeps its size),
+   * leaving room for the open ball to spread without being cropped to a box.
+   */
+  frame?: number;
   /** Tone of the surface behind the viewer, for the status text. */
   tone?: "dark" | "light";
   posterSizes?: string;
@@ -76,6 +86,9 @@ export function FootballViewer({
   shadow = "contact",
   autoRotate = true,
   recolor,
+  explode,
+  anchors,
+  frame = 1,
   tone = "dark",
   posterSizes = "(min-width: 1024px) 50vw, 100vw",
   posterPriority = false,
@@ -184,49 +197,27 @@ export function FootballViewer({
   const ready = status === "ready";
   const statusColor = tone === "dark" ? "text-white/60" : "text-slate";
 
+  // With frame > 1 the canvas is larger than the ball's own area, so panels can fly well
+  // outside it without being cropped. Only the ball's own area takes pointer input.
+  const inset = frame > 1 ? `${((1 - 1 / frame) / 2) * 100}%` : "0%";
+
   return (
     <div
       ref={container}
-      role="group"
-      aria-label={`3D model of the ${name} football. Drag or use the arrow keys to rotate.`}
-      tabIndex={ready ? 0 : -1}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
-      onKeyDown={onKeyDown}
-      className={`relative aspect-square w-full select-none ${ready ? "cursor-grab active:cursor-grabbing" : ""} ${className}`}
-      style={{ touchAction: "pan-y" }}
+      className={`relative aspect-square w-full select-none ${frame > 1 ? "pointer-events-none" : ""} ${className}`}
     >
-      {shadow !== "none" && (
-        <div
-          aria-hidden
-          className={`pointer-events-none absolute bottom-[4.5%] left-1/2 h-[9%] w-[62%] -translate-x-1/2 rounded-[50%] blur-md transition-opacity duration-700 ${
-            tone === "dark" ? "bg-black/70" : "bg-navy-deep/30"
-          } ${ready && shadow === "contact" ? "opacity-0" : "opacity-100"}`}
-        />
-      )}
-
-      {/* Poster sits in the same frame as the 3D ball, so the hand-over is a cross-fade. */}
-      <Image
-        src={poster}
-        alt={`${name} football`}
-        fill
-        sizes={posterSizes}
-        priority={posterPriority}
-        draggable={false}
-        className={`pointer-events-none object-contain p-[10.5%] transition-opacity duration-700 ${ready ? "opacity-0" : "opacity-100"}`}
-      />
-
       {shouldMount && status !== "idle" && (
         <div className={`absolute inset-0 transition-opacity duration-700 ${ready ? "opacity-100" : "opacity-0"}`}>
           <SceneBoundary onError={handleError}>
             <Suspense fallback={null}>
               <FootballScene
-                modelUrl={modelUrl}
+                modelUrl={eager ? modelUrl : modelUrl.replace("/footballs/", "/footballs/lite/")}
                 recolor={recolor}
+                explode={explode}
+                anchors={anchors}
+                frame={frame}
                 rotation={rotation}
-                autoRotateSpeed={autoRotate && !reducedMotion ? 0.35 : 0}
+                autoRotateSpeed={autoRotate && !reducedMotion ? 0.5 : 0}
                 active={onScreen}
                 shadow={shadow === "contact"}
                 lowPower={lowPower}
@@ -237,15 +228,47 @@ export function FootballViewer({
         </div>
       )}
 
-      <p
-        aria-live="polite"
-        className={`pointer-events-none absolute inset-x-0 bottom-1 text-center text-xs ${statusColor} transition-opacity duration-500 ${
-          status === "loading" || status === "unavailable" ? "opacity-100" : "opacity-0"
-        }`}
+      <div
+        role="group"
+        aria-label={`3D model of the ${name} football. Drag or use the arrow keys to rotate.`}
+        tabIndex={ready ? 0 : -1}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onKeyDown={onKeyDown}
+        className={`pointer-events-auto absolute ${ready ? "cursor-grab active:cursor-grabbing" : ""}`}
+        style={{ inset, touchAction: "pan-y" }}
       >
-        {status === "loading" && "Loading 3D model"}
-        {status === "unavailable" && "3D view is not available on this device. Showing a still image."}
-      </p>
+        {shadow !== "none" && (
+          <div
+            aria-hidden
+            className={`pointer-events-none absolute bottom-[4.5%] left-1/2 h-[9%] w-[62%] -translate-x-1/2 rounded-[50%] blur-md transition-opacity duration-700 ${
+              tone === "dark" ? "bg-black/70" : "bg-navy-deep/30"
+            } ${ready && shadow === "contact" ? "opacity-0" : "opacity-100"}`}
+          />
+        )}
+
+        {/* Poster sits in the same frame as the 3D ball, so the hand-over is a cross-fade. */}
+        <Image
+          src={poster}
+          alt={`${name} football`}
+          fill
+          sizes={posterSizes}
+          priority={posterPriority}
+          draggable={false}
+          className={`pointer-events-none object-contain p-[10.5%] transition-opacity duration-700 ${ready ? "opacity-0" : "opacity-100"}`}
+        />
+
+        <p
+          aria-live="polite"
+          className={`pointer-events-none absolute inset-x-0 bottom-1 text-center text-xs ${statusColor} transition-opacity duration-500 ${
+            status === "loading" || status === "unavailable" ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          {status === "loading" && "Loading 3D model"}
+          {status === "unavailable" && "3D view is not available on this device. Showing a still image."}
+        </p>
+      </div>
     </div>
-  );
-}
+  );}

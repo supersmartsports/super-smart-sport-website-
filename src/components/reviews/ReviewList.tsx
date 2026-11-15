@@ -36,11 +36,9 @@ export function ReviewsEmptyState({ tone = "light", context }: { tone?: "light" 
     >
       <MessageSquareQuote aria-hidden strokeWidth={1.25} className={`size-14 ${onDark ? "text-white/40" : "text-navy/35"}`} />
       <div>
-        <h3 className={`type-h3 ${onDark ? "text-white" : "text-navy-deep"}`}>No reviews published yet</h3>
+        <h3 className={`type-h3 ${onDark ? "text-white" : "text-navy-deep"}`}>No reviews yet</h3>
         <p className={`mt-3 max-w-[60ch] ${onDark ? "text-white/70" : "text-slate"}`}>
-          {context ??
-            "We only publish reviews from real customers, with their name and country. None have been added to this site so far."}{" "}
-          If you have ordered from {site.name}, send us your feedback and we will add it here.
+          {context ?? "We publish only real customer reviews."} Ordered from {site.name}? Send us your feedback.
         </p>
       </div>
       <ButtonAnchor href={site.contact.whatsappUrl} variant={onDark ? "outline-light" : "outline-dark"}>

@@ -45,6 +45,8 @@ export const viewport: Viewport = {
   themeColor: "#070b35",
   width: "device-width",
   initialScale: 1,
+  // Lets the floating chat button sit above the phone's bottom safe area.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

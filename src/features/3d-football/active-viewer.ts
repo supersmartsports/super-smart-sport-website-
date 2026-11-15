@@ -11,8 +11,8 @@ import { useEffect, useSyncExternalStore } from "react";
  * footballs are visible than there are slots, the extra ones show their still render
  * and go live as soon as a slot frees up.
  */
-const DESKTOP_SLOTS = 9;
-const MOBILE_SLOTS = 4;
+const DESKTOP_SLOTS = 6;
+const MOBILE_SLOTS = 3;
 
 /** Viewers currently asking for a slot, oldest first. */
 let queue: string[] = [];

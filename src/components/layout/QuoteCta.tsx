@@ -13,7 +13,7 @@ type Props = {
 /** Closing call to action. The one full red surface on a page. */
 export function QuoteCta({
   title = "Start your custom project",
-  text = "Tell us the type of football, the quantity and how you want it branded. We reply with what we need to prepare your quote.",
+  text = "Tell us the football, the quantity and your branding.",
   poster = "/images/footballs/32-panel-v5.webp",
 }: Props) {
   return (

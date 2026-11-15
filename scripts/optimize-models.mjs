@@ -2,7 +2,9 @@
 // Reads the originals in "ALL FOOTBALL/" (never modified), using the slug list in
 // src/data/products/models.json, and writes public/models/footballs/<slug>.glb
 // with WebP textures (max 2048px) and Meshopt-compressed geometry.
-// Usage: node scripts/optimize-models.mjs [--force]
+// With --lite it also writes smaller copies (1024px textures, about 40k triangles) to
+// public/models/footballs/lite, which cards and secondary footballs load for speed.
+// Usage: node scripts/optimize-models.mjs [--force] [--lite]
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { dedup, prune, weld, simplify, textureCompress, meshopt } from "@gltf-transform/functions";
@@ -12,9 +14,11 @@ import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const SRC = "ALL FOOTBALL";
-const OUT = "public/models/footballs";
 const MAX_TRIANGLES = 150_000;
 const force = process.argv.includes("--force");
+const lite = process.argv.includes("--lite");
+const OUT = lite ? "public/models/footballs/lite" : "public/models/footballs";
+const LITE_TRIANGLES = 40_000;
 
 const models = JSON.parse(readFileSync("src/data/products/models.json", "utf8"));
 
@@ -37,11 +41,11 @@ for (const { slug, source: file } of models) {
     for (const prim of mesh.listPrimitives())
       tris += (prim.getIndices()?.getCount() ?? prim.getAttribute("POSITION").getCount()) / 3;
 
+  const limit = lite ? LITE_TRIANGLES : MAX_TRIANGLES;
   const steps = [dedup(), prune(), weld()];
-  if (tris > MAX_TRIANGLES)
-    steps.push(simplify({ simplifier: MeshoptSimplifier, ratio: MAX_TRIANGLES / tris, error: 0.0005 }));
+  if (tris > limit) steps.push(simplify({ simplifier: MeshoptSimplifier, ratio: limit / tris, error: lite ? 0.001 : 0.0005 }));
   steps.push(
-    textureCompress({ encoder: sharp, targetFormat: "webp", resize: [2048, 2048], quality: 90 }),
+    textureCompress({ encoder: sharp, targetFormat: "webp", resize: lite ? [1024, 1024] : [2048, 2048], quality: lite ? 82 : 90 }),
     meshopt({ encoder: MeshoptEncoder, level: "medium" }),
   );
   await doc.transform(...steps);

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Header } from "@/components/navigation/Header";
 import { Footer } from "@/components/footer/Footer";
+import { WhatsAppWidget } from "@/components/whatsapp/WhatsAppWidget";
 
 export default function WebsiteLayout({ children }: { children: ReactNode }) {
   return (
@@ -14,6 +15,7 @@ export default function WebsiteLayout({ children }: { children: ReactNode }) {
       <Header />
       <main id="main">{children}</main>
       <Footer />
+      <WhatsAppWidget />
     </>
   );
 }

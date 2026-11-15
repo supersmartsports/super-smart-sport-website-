@@ -25,20 +25,16 @@ export default function ProductsPage() {
     <>
       <PageHero
         title="The football collection"
-        lead={`${products.length} original designs, each manufactured to order. Choose one as your starting point and we produce it with your logo, colours and specification.`}
+        lead={`${products.length} designs, each made to order.`}
       />
       <section className="bg-paper py-12 lg:py-16">
         <div className="shell">
           <ProductCatalog products={products} ratings={ratings} />
-          <p className="mt-10 max-w-[70ch] text-sm text-slate">
-            These footballs are design references, not stock. Nothing is sold ready-made. Construction and material are
-            shown where the original design defines them; everything else is specified with you when you request a quote.
-          </p>
         </div>
       </section>
       <QuoteCta
         title="Have your own design?"
-        text="You do not need to start from our collection. Send us your artwork or a description and we will work from that."
+        text="Send us your artwork."
         poster="/images/footballs/gold-32-panel.webp"
       />
     </>
