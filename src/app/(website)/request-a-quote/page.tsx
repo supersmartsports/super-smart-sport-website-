@@ -4,6 +4,7 @@ import { Mail } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa6";
 import { routes, site } from "@/config/site";
 import { QuoteForm } from "@/components/forms/QuoteForm";
+import { isSupabaseConfigured } from "@/lib/database/env";
 import { PageHero } from "@/components/layout/PageHero";
 
 export const metadata: Metadata = {
@@ -23,7 +24,7 @@ export default function QuotePage() {
         <div className="shell grid gap-10 lg:grid-cols-12">
           <div className="lg:col-span-8">
             <Suspense fallback={<div className="min-h-[40rem] rounded-sm bg-white ring-1 ring-line" />}>
-              <QuoteForm />
+              <QuoteForm backendEnabled={isSupabaseConfigured()} />
             </Suspense>
           </div>
           <aside className="lg:col-span-4">

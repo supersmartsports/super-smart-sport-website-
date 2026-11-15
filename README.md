@@ -13,21 +13,18 @@ The company is a **manufacturer, not a retailer**. Nothing is sold from stock: e
 
 ## Status
 
-Phase 2 (frontend) is complete: all public pages, the 3D football viewer, the customization studio and the quote form. It is frontend only. There is no backend, database, authentication or email service; the `admin` and `api` folders are still empty.
+- **Public website** (Phases 1 and 2): complete.
+- **Business platform** (Phase 3): the database foundation, access control, sign-in, the admin console, reports, quotation and invoice PDFs, CSV export and the quote-form connection are built and tested against a real Postgres engine. It has **not** been run against a Supabase project yet: that needs your credentials. See `docs/development/backend-setup.md`.
+- Financial rules: `docs/architecture/financial-methodology.md`. Plan and stage status: `docs/architecture/phase-3-plan.md`.
 
 ```bash
 npm install
-```
-
-```bash
 npm run dev
-```
-
-```bash
+npm test
 npm run build
 ```
 
-Set `NEXT_PUBLIC_SITE_URL` (see `.env.example`) once the domain is confirmed. Canonical URLs, the sitemap and social preview images use it.
+Set `NEXT_PUBLIC_SITE_URL` (see `.env.example`) once the domain is confirmed.
 
 ## 3D models
 
