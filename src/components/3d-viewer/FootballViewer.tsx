@@ -111,6 +111,32 @@ export function FootballViewer({
   const [onScreen, setOnScreen] = useState(eager);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
   const [lowPower, setLowPower] = useState(false);
+  // Primary viewers show their still image first and start the 3D engine only once the page has
+  // finished loading and the browser is idle, so the page paints and responds immediately.
+  const [armed, setArmed] = useState(!eager);
+  // On Data Saver or a very slow connection the 3D model (about 1 to 3 MB) waits for a tap.
+  const [needsTap, setNeedsTap] = useState(false);
+
+  useEffect(() => {
+    if (!eager || armed) return;
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    if (connection?.saveData || connection?.effectiveType === "slow-2g" || connection?.effectiveType === "2g") {
+      setNeedsTap(true);
+      return;
+    }
+    let cancelled = false;
+    const arm = () => {
+      if (cancelled) return;
+      if ("requestIdleCallback" in window) window.requestIdleCallback(() => !cancelled && setArmed(true), { timeout: 1500 });
+      else setTimeout(() => !cancelled && setArmed(true), 300);
+    };
+    if (document.readyState === "complete") arm();
+    else window.addEventListener("load", arm, { once: true });
+    return () => {
+      cancelled = true;
+      window.removeEventListener("load", arm);
+    };
+  }, [eager, armed]);
 
   useEffect(() => {
     const node = container.current;
@@ -143,7 +169,7 @@ export function FootballViewer({
 
   const viewerId = useId();
   const hasSlot = useViewerSlot(viewerId, !eager && settled);
-  const shouldMount = (eager ? nearViewport : hasSlot) && status !== "unavailable";
+  const shouldMount = (eager ? nearViewport && armed : hasSlot) && status !== "unavailable";
 
   // Back to the still render once the live viewer is released.
   useEffect(() => {
@@ -177,6 +203,7 @@ export function FootballViewer({
   }, []);
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (needsTap && !armed) setArmed(true);
     if (status !== "ready") return;
     rotation.current.dragging = true;
     rotation.current.velocity = 0;
@@ -232,7 +259,9 @@ export function FootballViewer({
           <SceneBoundary key={attempt} onError={handleError}>
             <Suspense fallback={null}>
               <FootballScene
-                modelUrl={eager ? modelUrl : modelUrl.replace("/footballs/", "/footballs/lite/")}
+                // Full-resolution model for primary viewers on desktop; the lighter version (about a
+                // third of the size, lower-resolution textures) for grids and for phones and tablets.
+                modelUrl={eager && !lowPower ? modelUrl : modelUrl.replace("/footballs/", "/footballs/lite/")}
                 recolor={recolor}
                 explode={explode}
                 anchors={anchors}
@@ -287,10 +316,11 @@ export function FootballViewer({
           aria-live="polite"
           data-reason={status === "unavailable" ? reason.current : undefined}
           className={`pointer-events-none absolute inset-x-0 bottom-1 text-center text-xs ${statusColor} transition-opacity duration-500 ${
-            status === "loading" || (status === "unavailable" && eager) ? "opacity-100" : "opacity-0"
+            status === "loading" || (status === "unavailable" && eager) || (needsTap && !armed) ? "opacity-100" : "opacity-0"
           }`}
         >
           {status === "loading" && "Loading 3D model"}
+          {needsTap && !armed && "Tap the ball to load the 3D view"}
           {status === "unavailable" && eager && "3D view is not available on this device. Showing a still image."}
         </p>
       </div>

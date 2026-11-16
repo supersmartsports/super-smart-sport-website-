@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, m as motion, useReducedMotion } from "motion/react";
 import { Send, X } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa6";
 import { site } from "@/config/site";

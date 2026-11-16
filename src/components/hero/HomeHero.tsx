@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { m as motion, useReducedMotion } from "motion/react";
 import { routes } from "@/config/site";
 import type { Product } from "@/types/product";
 import { FootballViewer } from "@/components/3d-viewer/FootballViewer";

@@ -238,6 +238,10 @@ function buildPanels(scene: Object3D, centre: Vector3) {
   return { root, pieces, outerAnchor, materials: [...materials.values()], geometries };
 }
 
+/** Models that were shown and then released, newest last. Only a few are kept parsed, to bound memory on phones. */
+const recentModels: string[] = [];
+const RECENT_MODELS = 3;
+
 function Football({
   modelUrl,
   recolor,
@@ -339,7 +343,12 @@ function Football({
         }
         material.dispose();
       });
-      useGLTF.clear(modelUrl);
+      // GPU memory is released above, but the parsed model stays in memory for the last few
+      // footballs viewed, so coming back to one is instant (no download, no decoding).
+      const at = recentModels.indexOf(modelUrl);
+      if (at >= 0) recentModels.splice(at, 1);
+      recentModels.push(modelUrl);
+      while (recentModels.length > RECENT_MODELS) useGLTF.clear(recentModels.shift()!);
     };
   }, [scene, modelUrl]);
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, m as motion, useReducedMotion } from "motion/react";
 import { Menu, X } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa6";
 import { routes, site } from "@/config/site";
