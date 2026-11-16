@@ -58,6 +58,8 @@ export type FootballSceneProps = {
   /** Keeps the frame readable for image export. Off in normal use. */
   preserveDrawingBuffer?: boolean;
   onReady?: () => void;
+  /** Called if the browser takes the 3D context away (for example too many canvases are open). */
+  onContextLost?: () => void;
 };
 
 const textureSlots = ["map", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "clearcoatNormalMap"] as const;
@@ -486,6 +488,7 @@ export default function FootballScene({
   lowPower = false,
   preserveDrawingBuffer = false,
   onReady,
+  onContextLost,
 }: FootballSceneProps) {
   return (
     <Canvas
@@ -494,6 +497,10 @@ export default function FootballScene({
       camera={{ fov: 26, position: [0, 0, 5.6 * frame], near: 0.1, far: 30 * frame }}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance", preserveDrawingBuffer }}
       onCreated={({ gl }) => {
+        gl.domElement.addEventListener("webglcontextlost", (event) => {
+          event.preventDefault();
+          onContextLost?.();
+        });
         gl.toneMapping = NeutralToneMapping;
         gl.toneMappingExposure = 1.05;
       }}

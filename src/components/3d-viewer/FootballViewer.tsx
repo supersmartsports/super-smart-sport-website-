@@ -35,13 +35,20 @@ class SceneBoundary extends Component<{ onError: () => void; children: ReactNode
   }
 }
 
+let webglSupport: boolean | null = null;
+
+/** Checked once, and the test context is released straight away: browsers allow only a limited number of live WebGL contexts. */
 function supportsWebGL() {
+  if (webglSupport !== null) return webglSupport;
   try {
     const canvas = document.createElement("canvas");
-    return Boolean(canvas.getContext("webgl2") ?? canvas.getContext("webgl"));
+    const gl = (canvas.getContext("webgl2") ?? canvas.getContext("webgl")) as WebGLRenderingContext | null;
+    webglSupport = Boolean(gl);
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
   } catch {
-    return false;
+    webglSupport = false;
   }
+  return webglSupport;
 }
 
 export type FootballViewerProps = {
@@ -153,7 +160,18 @@ export function FootballViewer({
   }, [modelUrl]);
 
   const handleReady = useCallback(() => setStatus("ready"), []);
-  const handleError = useCallback(() => setStatus("unavailable"), []);
+  // A failed or lost 3D context is retried a couple of times before falling back to the still image for good.
+  const [attempt, setAttempt] = useState(0);
+  const handleError = useCallback(() => {
+    setAttempt((current) => {
+      if (current < 2) {
+        setTimeout(() => setStatus("loading"), 0);
+        return current + 1;
+      }
+      setTimeout(() => setStatus("unavailable"), 0);
+      return current;
+    });
+  }, []);
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (status !== "ready") return;
@@ -208,7 +226,7 @@ export function FootballViewer({
     >
       {shouldMount && status !== "idle" && (
         <div className={`absolute inset-0 transition-opacity duration-700 ${ready ? "opacity-100" : "opacity-0"}`}>
-          <SceneBoundary onError={handleError}>
+          <SceneBoundary key={attempt} onError={handleError}>
             <Suspense fallback={null}>
               <FootballScene
                 modelUrl={eager ? modelUrl : modelUrl.replace("/footballs/", "/footballs/lite/")}
@@ -222,6 +240,7 @@ export function FootballViewer({
                 shadow={shadow === "contact"}
                 lowPower={lowPower}
                 onReady={handleReady}
+                onContextLost={handleError}
               />
             </Suspense>
           </SceneBoundary>
@@ -267,7 +286,7 @@ export function FootballViewer({
           }`}
         >
           {status === "loading" && "Loading 3D model"}
-          {status === "unavailable" && "3D view is not available on this device. Showing a still image."}
+          {status === "unavailable" && eager && "3D view is not available on this device. Showing a still image."}
         </p>
       </div>
     </div>
