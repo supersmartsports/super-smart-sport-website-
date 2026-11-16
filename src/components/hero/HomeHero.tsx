@@ -1,12 +1,7 @@
-"use client";
-
-import { m as motion, useReducedMotion } from "motion/react";
 import { routes } from "@/config/site";
 import type { Product } from "@/types/product";
 import { FootballViewer } from "@/components/3d-viewer/FootballViewer";
 import { ButtonLink } from "@/components/buttons/Button";
-
-const ease = [0.16, 1, 0.3, 1] as const;
 
 const headline = ["Engineered for", "the game.", "Manufactured", "for your brand."];
 
@@ -18,16 +13,6 @@ const facts = [
 ];
 
 export function HomeHero({ product }: { product: Product }) {
-  const reducedMotion = useReducedMotion();
-  const rise = (delay: number) =>
-    reducedMotion
-      ? {}
-      : {
-          initial: { opacity: 0, y: 24 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.8, delay, ease },
-        };
-
   return (
     <section className="relative isolate overflow-hidden bg-navy-deep text-white">
       {/* Studio backdrop: one pool of brand navy behind the ball. */}
@@ -42,45 +27,30 @@ export function HomeHero({ product }: { product: Product }) {
             <h1 className="type-display">
               {headline.map((line, index) => (
                 <span key={line} className="block overflow-hidden pb-[0.06em] whitespace-nowrap">
-                  <motion.span
-                    className="block"
-                    {...(reducedMotion
-                      ? {}
-                      : {
-                          initial: { y: "105%" },
-                          animate: { y: 0 },
-                          transition: { duration: 0.9, delay: 0.08 * index, ease },
-                        })}
-                  >
+                  <span className="hero-line block" style={{ ["--d" as string]: `${0.08 * index}s` }}>
                     {line}
-                  </motion.span>
+                  </span>
                 </span>
               ))}
             </h1>
 
-            <motion.p {...rise(0.45)} className="type-lead mt-7 hidden max-w-[46ch] text-white/80 lg:block">
+            <p style={{ ["--d" as string]: "0.45s" }} className="hero-rise type-lead mt-7 hidden max-w-[46ch] text-white/80 lg:block">
               Premium customized football manufacturing, engineered around your designs, specifications and brand
               identity.
-            </motion.p>
-            <motion.div {...rise(0.55)} className="mt-9 hidden flex-wrap gap-3 lg:flex">
+            </p>
+            <div style={{ ["--d" as string]: "0.55s" }} className="hero-rise mt-9 hidden flex-wrap gap-3 lg:flex">
               <ButtonLink href={routes.quote} size="lg">
                 Start Your Custom Project
               </ButtonLink>
               <ButtonLink href={routes.products} variant="outline-light" size="lg">
                 Explore Our Footballs
               </ButtonLink>
-            </motion.div>
+            </div>
           </div>
 
-          <motion.div
-            className="relative mx-auto w-[min(88vw,58svh)] lg:col-span-5 lg:mx-0 lg:w-[128%] lg:max-w-[54rem] lg:justify-self-center"
-            {...(reducedMotion
-              ? {}
-              : {
-                  initial: { opacity: 0, scale: 0.92 },
-                  animate: { opacity: 1, scale: 1 },
-                  transition: { duration: 1.2, delay: 0.15, ease },
-                })}
+          <div
+            style={{ ["--d" as string]: "0.15s" }}
+            className="hero-ball relative mx-auto w-[min(88vw,58svh)] lg:col-span-5 lg:mx-0 lg:w-[128%] lg:max-w-[54rem] lg:justify-self-center"
           >
             <FootballViewer
               modelUrl={product.model}
@@ -93,7 +63,7 @@ export function HomeHero({ product }: { product: Product }) {
             <p className="pointer-events-none absolute bottom-0 left-1/2 hidden -translate-x-1/2 text-sm text-white/45 lg:block">
               Drag to rotate
             </p>
-          </motion.div>
+          </div>
 
           {/* On small screens the message follows the ball, so the product leads. */}
           <div className="pb-8 lg:hidden">
@@ -112,9 +82,9 @@ export function HomeHero({ product }: { product: Product }) {
           </div>
         </div>
 
-        <motion.ul
-          {...rise(0.7)}
-          className="grid grid-cols-2 border-t border-white/15 lg:grid-cols-4"
+        <ul
+          style={{ ["--d" as string]: "0.7s" }}
+          className="hero-rise grid grid-cols-2 border-t border-white/15 lg:grid-cols-4"
           aria-label="What we manufacture"
         >
           {facts.map((fact, index) => (
@@ -127,7 +97,7 @@ export function HomeHero({ product }: { product: Product }) {
               {fact}
             </li>
           ))}
-        </motion.ul>
+        </ul>
       </div>
     </section>
   );
