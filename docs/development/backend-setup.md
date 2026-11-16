@@ -1,7 +1,15 @@
 # Backend setup and deployment
 
-Nothing here has been run against a real Supabase project: that needs your credentials. Do each step yourself,
-on a **new, empty Supabase project first** (a staging project), and only then on production.
+**Staging status (checked on a real project):** migrations 0001 to 0012 and `database/seed/products.sql` applied with no errors on a new
+Supabase project, and `npm run live:check` passed 8 of 8 database checks. The public site built against it (20 products from the database) and a
+quote sent from the real form was saved and returned a reference. Not yet checked live: admin sign-in, role permissions, the
+quotation to invoice flow, artwork upload and password-reset email (they need the owner login and the server key, see sections 2 and 4).
+
+Notes from that run:
+- New Supabase projects show a *publishable* key (`sb_publishable_...`); it works as `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The server key is a *secret* key (`sb_secret_...`) or the legacy `service_role` key. Only the server key is secret.
+- In the SQL editor Supabase warns that tables have no row level security. Choose **Run and enable RLS**; migration 0008 sets the real policies.
+
+Do each step yourself, on a **new, empty Supabase project first** (a staging project), and only then on production.
 
 ## 1. Create the project
 
