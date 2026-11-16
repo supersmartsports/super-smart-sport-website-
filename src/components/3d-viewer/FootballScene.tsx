@@ -456,6 +456,31 @@ function Football({
   );
 }
 
+/**
+ * Phones draw at 30 frames per second while the ball turns on its own, which halves the continuous
+ * work and battery use. Dragging, or a ball still spinning after a flick, draws at the full screen rate.
+ */
+function FrameLimiter({ active, rotation }: { active: boolean; rotation: RefObject<RotationState> }) {
+  const invalidate = useThree((state) => state.invalidate);
+  useEffect(() => {
+    if (!active) return;
+    let frame = 0;
+    let last = 0;
+    const tick = (now: number) => {
+      const spin = rotation.current;
+      const busy = spin.dragging || Math.abs(spin.velocity) > 0.15;
+      if (busy || now - last >= 33) {
+        last = now;
+        invalidate();
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [active, invalidate, rotation]);
+  return null;
+}
+
 /** The render loop sleeps while the canvas is off screen; this wakes it when the canvas returns. */
 function ResumeLoop({ active }: { active: boolean }) {
   const invalidate = useThree((state) => state.invalidate);
@@ -518,7 +543,7 @@ export default function FootballScene({
   const maxDpr = frame > 1 && typeof window !== "undefined" ? Math.min(1.5, Math.max(0.75, 1500 / (frame * 0.7 * window.innerHeight))) : lowPower ? 1.5 : 2;
   return (
     <Canvas
-      frameloop={active ? "always" : "never"}
+      frameloop={active ? (lowPower ? "demand" : "always") : "never"}
       dpr={[Math.min(1, maxDpr), maxDpr]}
       camera={{ fov: 26, position: [0, 0, 5.6 * frame], near: 0.1, far: 30 * frame }}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance", preserveDrawingBuffer }}
@@ -533,6 +558,7 @@ export default function FootballScene({
       style={{ touchAction: "pan-y" }}
     >
       <ResumeLoop active={active} />
+      {lowPower && <FrameLimiter active={active} rotation={rotation} />}
       {fallbackLighting ? <PlainLighting /> : <StudioLighting />}
       <Football
         modelUrl={modelUrl}
