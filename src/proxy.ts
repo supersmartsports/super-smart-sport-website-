@@ -28,9 +28,12 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  const { data } = await supabase.auth.getUser();
-  if (!data.user && !open) return redirectTo("/admin/login");
-  if (data.user && onLogin) return redirectTo("/admin/dashboard");
+  // getClaims checks the signed login token here, without a call to the auth server on every page
+  // (getUser calls it each time and is rate limited, which signed staff out under normal use).
+  const { data } = await supabase.auth.getClaims();
+  const signedIn = Boolean(data?.claims?.sub);
+  if (!signedIn && !open) return redirectTo("/admin/login");
+  if (signedIn && onLogin) return redirectTo("/admin/dashboard");
   return response;
 }
 

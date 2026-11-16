@@ -7,6 +7,8 @@ quotation to invoice flow, artwork upload and password-reset email (they need th
 
 Notes from that run:
 - New Supabase projects show a *publishable* key (`sb_publishable_...`); it works as `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The server key is a *secret* key (`sb_secret_...`) or the legacy `service_role` key. Only the server key is secret.
+- Admin sign-in was then tested live: the owner signed in on the real login page and every admin screen loaded in one session. The owner here was created with SQL and a staging password, so change it before real use.
+- Your computer's clock must be correct. If it is hours off, login tokens look expired, the app keeps refreshing them and Supabase answers "Request rate limit reached", which signs staff out. Turn on automatic time and time zone in Windows. (The admin now verifies the signed token locally with `getClaims`, so it no longer calls the auth server on every page.)
 - In the SQL editor Supabase warns that tables have no row level security. Choose **Run and enable RLS**; migration 0008 sets the real policies.
 
 Do each step yourself, on a **new, empty Supabase project first** (a staging project), and only then on production.

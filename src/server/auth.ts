@@ -13,8 +13,10 @@ import { hasPermission, type PermissionKey, type SessionUser } from "@/features/
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   if (!isSupabaseConfigured()) return null;
   const supabase = await createUserClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return null;
+  // The token's signature is verified locally; the database then re-checks the person on every query.
+  const { data: auth } = await supabase.auth.getClaims();
+  const claims = auth?.claims;
+  if (!claims?.sub) return null;
 
   const { data, error } = await supabase.rpc("my_access");
   const row = Array.isArray(data) ? data[0] : data;
@@ -22,7 +24,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
 
   return {
     id: row.user_id,
-    email: auth.user.email ?? "",
+    email: (claims.email as string | undefined) ?? "",
     fullName: row.full_name,
     roleKey: row.role_key,
     roleName: row.role_name,
