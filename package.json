@@ -12,7 +12,8 @@
     "models:optimize": "node scripts/optimize-models.mjs",
     "models:lite": "node scripts/optimize-models.mjs --lite",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "live:check": "node --env-file=.env.local scripts/live-check.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
