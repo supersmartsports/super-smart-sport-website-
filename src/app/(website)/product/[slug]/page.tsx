@@ -6,8 +6,8 @@ import { ChevronRight } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa6";
 import { routes, site } from "@/config/site";
 import { footballTypes } from "@/data/categories";
-import { getProduct, products } from "@/data/products";
-import { averageRating, reviewsForProduct } from "@/data/reviews";
+import { getApprovedReviews, getCatalog, getCatalogProduct } from "@/server/catalog";
+import { ReviewForm } from "@/components/reviews/ReviewForm";
 import { BallJourney, BallSlot } from "@/components/3d-viewer/BallJourney";
 import { ButtonAnchor, ButtonLink } from "@/components/buttons/Button";
 import { QuoteCta } from "@/components/layout/QuoteCta";
@@ -18,14 +18,16 @@ import { StarRating } from "@/components/reviews/StarRating";
 
 type Params = { params: Promise<{ slug: string }> };
 
-export function generateStaticParams() {
-  return products.map(({ slug }) => ({ slug }));
+export async function generateStaticParams() {
+  return (await getCatalog()).products.map(({ slug }) => ({ slug }));
 }
 
-export const dynamicParams = false;
+// A product published after the last build is rendered on first request; reviews and edits appear within five minutes.
+export const dynamicParams = true;
+export const revalidate = 300;
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const product = getProduct((await params).slug);
+  const product = await getCatalogProduct((await params).slug);
   if (!product) return {};
   const description = `${product.name}: a ${product.panelCount}-panel football design from ${site.name}, manufactured to order with your logo, colours and specification. View it in 3D and request a quote.`;
   return {
@@ -40,11 +42,12 @@ const perOrder = "Per order";
 const yourWords = ["Your logo", "Your colours", "Your graphics", "Your panel design"];
 
 export default async function ProductPage({ params }: Params) {
-  const product = getProduct((await params).slug);
+  const [{ products }, product] = await Promise.all([getCatalog(), getCatalogProduct((await params).slug)]);
   if (!product) notFound();
 
-  const productReviews = reviewsForProduct(product.slug);
-  const rating = averageRating(productReviews);
+  const reviewData = await getApprovedReviews({ productSlug: product.slug, pageSize: 6 });
+  const productReviews = reviewData.reviews;
+  const rating = reviewData.average;
   const quoteHref = `${routes.quote}?design=${product.slug}`;
   const related = products.filter((p) => p.slug !== product.slug && p.family === product.family).slice(0, 3);
   const others = related.length === 3 ? related : products.filter((p) => p.slug !== product.slug).slice(0, 3);
@@ -113,7 +116,7 @@ export default async function ProductPage({ params }: Params) {
               {rating !== null && (
                 <p className="mt-4 flex items-center gap-2 text-white/75">
                   <StarRating value={rating} />
-                  {rating.toFixed(1)} from {productReviews.length} {productReviews.length === 1 ? "review" : "reviews"}
+                  {rating.toFixed(1)} from {reviewData.count} {reviewData.count === 1 ? "review" : "reviews"}
                 </p>
               )}
               <p className="mt-6 flex items-center gap-2.5 font-semibold">
@@ -217,6 +220,7 @@ export default async function ProductPage({ params }: Params) {
         <div className="shell">
           <h2 className="type-h2 mb-10 text-navy-deep">Reviews</h2>
           <ReviewList reviews={productReviews} emptyContext="No reviews yet." />
+          <div className="mt-10 max-w-3xl"><ReviewForm productSlug={product.slug} /></div>
         </div>
       </section>
 

@@ -7,7 +7,8 @@ import { createServiceClient } from "@/lib/database/admin";
 import { requirePermission, requireUser } from "@/server/auth";
 import { hasPermission } from "@/features/auth/permissions";
 import { canTransition, ORDER_STATUSES, type OrderStatus } from "@/features/orders/workflow";
-import { moduleBySlug } from "./modules";
+import { checkFile } from "@/lib/uploads";
+import { ATTACHMENT_ENTITY, ATTACHMENT_KINDS, moduleBySlug } from "./modules";
 import { parseForm } from "./schema";
 
 export type ActionState = { error?: string; ok?: string; fieldErrors?: Record<string, string> };
@@ -171,4 +172,43 @@ export async function createEmployee(_prev: ActionState, formData: FormData): Pr
   }
   revalidatePath("/admin/employees");
   redirect(`/admin/employees/${created.user.id}`);
+}
+
+/** Attach a file (artwork, payment proof, receipt, photo ...) to a record. The file's real type is checked from its bytes. */
+export async function uploadAttachment(slug: string, id: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  const config = configOrThrow(slug);
+  const entity = ATTACHMENT_ENTITY[slug];
+  if (!entity || !config.write) return { error: "Files cannot be attached here." };
+  await requirePermission(config.write);
+  const file = formData.get("file");
+  const kind = String(formData.get("kind") ?? "document");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a file." };
+  if (!(ATTACHMENT_KINDS as readonly string[]).includes(kind)) return { error: "Choose what kind of file it is." };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const checked = checkFile(file, bytes);
+  if (!checked.ok) return { error: checked.reason };
+
+  const supabase = await createUserClient();
+  const path = `${entity}/${id}/${crypto.randomUUID()}-${checked.name}`;
+  const { error: uploadError } = await supabase.storage.from("business-files").upload(path, bytes, { contentType: checked.type.mime, upsert: false });
+  if (uploadError) return { error: friendly(uploadError) };
+  const { error } = await supabase.from("attachments").insert({ entity_type: entity, entity_id: id, kind, storage_path: path, file_name: checked.name, mime_type: checked.type.mime, size_bytes: bytes.length });
+  if (error) {
+    await supabase.storage.from("business-files").remove([path]); // never leave a file with no record
+    return { error: friendly(error) };
+  }
+  revalidatePath(`/admin/${slug}/${id}`);
+  return { ok: "File attached." };
+}
+
+export async function deleteAttachment(slug: string, id: string, attachmentId: string): Promise<void> {
+  const config = configOrThrow(slug);
+  if (!config.write) return;
+  await requirePermission(config.write);
+  const supabase = await createUserClient();
+  const { data } = await supabase.from("attachments").select("storage_path").eq("id", attachmentId).eq("entity_id", id).maybeSingle();
+  if (!data) return;
+  const { error } = await supabase.from("attachments").delete().eq("id", attachmentId);
+  if (!error) await supabase.storage.from("business-files").remove([data.storage_path]);
+  revalidatePath(`/admin/${slug}/${id}`);
 }

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { routes, site } from "@/config/site";
 import { capabilities } from "@/constants/content";
 import { DesignStudio } from "@/components/customization/DesignStudio";
+import { getCatalog } from "@/server/catalog";
 import { QuoteCta } from "@/components/layout/QuoteCta";
 
 export const metadata: Metadata = {
@@ -11,7 +12,10 @@ export const metadata: Metadata = {
   alternates: site.url ? { canonical: routes.customization } : undefined,
 };
 
-export default function CustomizationPage() {
+export const revalidate = 300;
+
+export default async function CustomizationPage() {
+  const { products } = await getCatalog();
   return (
     <>
       <section className="bg-navy-deep text-white">
@@ -22,7 +26,7 @@ export default function CustomizationPage() {
             brief for your quote.
           </p>
           <Suspense fallback={<div className="min-h-[60svh]" />}>
-            <DesignStudio />
+            <DesignStudio products={products} />
           </Suspense>
         </div>
       </section>

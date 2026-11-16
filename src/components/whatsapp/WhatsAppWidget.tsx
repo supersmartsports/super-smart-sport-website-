@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Send, X } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa6";
@@ -77,6 +78,15 @@ export function WhatsAppWidget({
   const button = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const pathname = usePathname();
+  // On a football page the chat offers a message about that football.
+  const [productName, setProductName] = useState<string | null>(null);
+  useEffect(() => {
+    setProductName(pathname.startsWith("/product/") ? document.querySelector("h1")?.textContent?.trim() || null : null);
+  }, [pathname]);
+  const replies: QuickReply[] = productName
+    ? [{ label: `Ask about the ${productName}`, message: `Hello ${name}! I am interested in the ${productName} football and would like to customize it. Please share more information.` }, ...quickReplies]
+    : quickReplies;
 
   const close = useCallback((returnFocus = true) => {
     setOpen(false);
@@ -198,7 +208,7 @@ export function WhatsAppWidget({
 
               <p className="mt-5 mb-2.5 text-xs font-semibold text-slate">Choose a topic</p>
               <ul className="flex flex-col items-start gap-2">
-                {quickReplies.map(({ label, message }, index) => (
+                {replies.map(({ label, message }, index) => (
                   <motion.li
                     key={label}
                     initial={reducedMotion ? false : { opacity: 0, y: 8 }}

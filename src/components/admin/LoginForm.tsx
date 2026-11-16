@@ -30,6 +30,7 @@ export function LoginForm() {
       <Button type="submit" size="lg" disabled={pending} className="w-full">
         {pending ? "Signing in" : "Sign in"}
       </Button>
+      <p className="text-center text-sm"><a href="/admin/forgot-password" className="text-white/75 underline underline-offset-4 hover:text-white">Forgot your password?</a></p>
     </form>
   );
 }

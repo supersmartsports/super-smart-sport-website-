@@ -140,3 +140,24 @@ export function DeleteRowButton({ action, label }: { action: () => Promise<void>
     </form>
   );
 }
+
+/** Upload a file to a record. Only PNG, JPEG, WebP and PDF up to 10 MB are accepted; the server checks the real file type. */
+export function UploadForm({ action, kinds }: { action: SaveAction; kinds: readonly string[] }) {
+  const [state, formAction, pending] = useActionState(action, {});
+  return (
+    <form action={formAction} className="mt-4 flex flex-wrap items-end gap-3 rounded-sm bg-paper p-4">
+      <div>
+        <label htmlFor="att-kind" className="type-label">Type</label>
+        <select id="att-kind" name="kind" className={`${control} min-w-40 border-line`} defaultValue="document">
+          {kinds.map((k) => <option key={k} value={k}>{k.charAt(0).toUpperCase() + k.slice(1)}</option>)}
+        </select>
+      </div>
+      <div className="min-w-60 flex-1">
+        <label htmlFor="att-file" className="type-label">File (PNG, JPEG, WebP or PDF, up to 10 MB)</label>
+        <input id="att-file" name="file" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" required className="mt-1.5 block w-full text-sm file:mr-3 file:min-h-11 file:rounded-xs file:border-0 file:bg-navy file:px-4 file:font-semibold file:text-white" />
+      </div>
+      <Button type="submit" variant="dark" disabled={pending}>{pending ? "Uploading" : "Attach file"}</Button>
+      <div className="basis-full"><Feedback state={state} /></div>
+    </form>
+  );
+}

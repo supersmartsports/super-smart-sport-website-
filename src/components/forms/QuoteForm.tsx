@@ -5,8 +5,9 @@ import { useSearchParams } from "next/navigation";
 import { Check, Copy, Mail, Pencil } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa6";
 import { site } from "@/config/site";
+import { MAX_FILES_PER_REQUEST, MAX_UPLOAD_BYTES } from "@/lib/uploads";
 import { submitInquiry, type SubmitResult } from "@/features/quote-requests/actions";
-import { getProduct, products } from "@/data/products";
+import type { Product } from "@/types/product";
 import { typeOptions } from "@/features/football-customization/options";
 import {
   buildInquiryText,
@@ -23,7 +24,8 @@ import { SelectField, TextAreaField, TextField } from "./Field";
 const fieldOrder: (keyof QuoteInquiry)[] = ["name", "company", "email", "country", "whatsapp", "footballType", "quantity"];
 
 /** Turns a brief passed in the URL (from a product page or the studio) into starting values. */
-function initialFromParams(params: URLSearchParams): Partial<QuoteInquiry> {
+function initialFromParams(params: URLSearchParams, products: Product[]): Partial<QuoteInquiry> {
+  const getProduct = (slug: string) => products.find((p) => p.slug === slug);
   const values: Partial<QuoteInquiry> = {};
   const product = getProduct(params.get("design") ?? "");
   if (product) values.design = `${product.name} (${product.sku})`;
@@ -46,7 +48,7 @@ function initialFromParams(params: URLSearchParams): Partial<QuoteInquiry> {
   return values;
 }
 
-export function QuoteForm({ backendEnabled = false }: { backendEnabled?: boolean }) {
+export function QuoteForm({ backendEnabled = false, products }: { backendEnabled?: boolean; products: Product[] }) {
   const searchParams = useSearchParams();
   const [values, setValues] = useState<QuoteInquiry>(emptyInquiry);
   const [errors, setErrors] = useState<InquiryErrors>({});
@@ -54,6 +56,10 @@ export function QuoteForm({ backendEnabled = false }: { backendEnabled?: boolean
   const [copied, setCopied] = useState(false);
   const [sendResult, setSendResult] = useState<SubmitResult | null>(null);
   const [sending, startSending] = useTransition();
+  const [files, setFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState("");
+  // One key per form, so a double click or retry can never create a second inquiry.
+  const submissionKey = useRef(typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now());
   const [trap, setTrap] = useState(""); // hidden spam trap: real visitors never fill it in
   // The form only works with scripts running. Until then the button stays disabled, so the
   // browser can never fall back to a plain submit that would put the answers in the address bar.
@@ -63,7 +69,7 @@ export function QuoteForm({ backendEnabled = false }: { backendEnabled?: boolean
   const form = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    setValues((current) => ({ ...current, ...initialFromParams(searchParams) }));
+    setValues((current) => ({ ...current, ...initialFromParams(searchParams, products) }));
   }, [searchParams]);
 
   useEffect(() => {
@@ -89,8 +95,21 @@ export function QuoteForm({ backendEnabled = false }: { backendEnabled?: boolean
 
   const text = buildInquiryText(values);
   const sent = sendResult?.status === "sent";
+  const reference = sendResult?.status === "sent" ? sendResult.reference : null;
   const sendToCompany = () =>
-    startSending(async () => setSendResult(await submitInquiry({ ...values, website: trap } as unknown as Record<string, string>)));
+    startSending(async () => {
+      const data = new FormData();
+      for (const [name, value] of Object.entries(values)) data.set(name, value);
+      data.set("website", trap);
+      data.set("key", submissionKey.current);
+      for (const file of files) data.append("artwork", file);
+      setSendResult(await submitInquiry(data));
+    });
+  const whatsappAfterSend = reference
+    ? whatsappLink(`Hello ${site.name}! I just sent a quote request through your website. My reference is ${reference}.
+
+Name: ${values.name}`)
+    : null;
 
   if (prepared) {
     return (
@@ -116,6 +135,19 @@ export function QuoteForm({ backendEnabled = false }: { backendEnabled?: boolean
             <p role={sendResult?.status === "error" ? "alert" : "status"} aria-live="polite" className="mt-2 text-sm font-semibold text-red-deep">
               {sendResult?.status === "error" ? sendResult.message : ""}
             </p>
+          </div>
+        )}
+
+        {sent && sendResult?.status === "sent" && (
+          <div role="status" className="mt-6 rounded-sm bg-paper p-5 ring-1 ring-line">
+            {reference && <p className="font-bold text-navy-deep">Your reference: <span className="tabular-nums">{reference}</span></p>}
+            {sendResult.duplicate && <p className="mt-1 text-sm text-slate">This request had already been received, so no second one was created.</p>}
+            {sendResult.artwork.saved > 0 && <p className="mt-1 text-sm text-slate">{sendResult.artwork.saved} file{sendResult.artwork.saved === 1 ? "" : "s"} attached.</p>}
+            {sendResult.artwork.failed.length > 0 && <p role="alert" className="mt-1 text-sm font-semibold text-red-deep">These files could not be attached: {sendResult.artwork.failed.join(", ")}. Send them to us on WhatsApp or email with your reference.</p>}
+            {whatsappAfterSend && (
+              <ButtonAnchor href={whatsappAfterSend} variant="dark" className="mt-4"><FaWhatsapp aria-hidden className="size-5" />Message us on WhatsApp with this reference</ButtonAnchor>
+            )}
+            <p className="mt-3 text-sm text-slate">Opening WhatsApp only prepares a message. Nothing is sent from your phone until you press send.</p>
           </div>
         )}
 
@@ -242,6 +274,24 @@ export function QuoteForm({ backendEnabled = false }: { backendEnabled?: boolean
           />
         </div>
       </fieldset>
+
+      {backendEnabled && (
+        <div className="mt-6">
+          <label htmlFor="artwork" className="type-label flex items-baseline justify-between text-navy-deep"><span>Artwork or logo files</span><span className="font-medium tracking-normal text-slate normal-case">Optional</span></label>
+          <input id="artwork" name="artwork" type="file" multiple accept="image/png,image/jpeg,image/webp,application/pdf"
+            onChange={(event) => {
+              const picked = Array.from(event.target.files ?? []);
+              const tooMany = picked.length > MAX_FILES_PER_REQUEST;
+              const tooBig = picked.find((f) => f.size > MAX_UPLOAD_BYTES);
+              if (tooMany || tooBig) { setFileError(tooMany ? `Choose at most ${MAX_FILES_PER_REQUEST} files.` : `${tooBig!.name} is larger than 10 MB.`); setFiles([]); event.target.value = ""; return; }
+              setFileError(""); setFiles(picked);
+            }}
+            className="mt-2 block w-full text-sm file:mr-4 file:min-h-11 file:rounded-xs file:border-0 file:bg-navy file:px-4 file:font-semibold file:text-white" />
+          <p className="mt-1.5 text-sm text-slate">PNG, JPEG, WebP or PDF, up to {MAX_FILES_PER_REQUEST} files of 10 MB each.</p>
+          {fileError && <p role="alert" className="mt-1 text-sm font-semibold text-red-deep">{fileError}</p>}
+          {files.length > 0 && <p className="mt-1 text-sm text-slate">{files.map((f) => f.name).join(", ")}</p>}
+        </div>
+      )}
 
       <div className="mt-9 flex flex-col gap-4 sm:flex-row sm:items-center">
         <Button type="submit" size="lg" disabled={!interactive}>

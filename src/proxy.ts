@@ -10,9 +10,11 @@ import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/databa
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const onLogin = pathname === "/admin/login";
+  // Pages a signed-out person must be able to reach: sign-in, the reset request, and the emailed link.
+  const open = onLogin || pathname === "/admin/forgot-password" || pathname === "/admin/auth/callback";
   const redirectTo = (path: string) => NextResponse.redirect(new URL(path, request.url));
 
-  if (!isSupabaseConfigured()) return onLogin ? NextResponse.next() : redirectTo("/admin/login");
+  if (!isSupabaseConfigured()) return open ? NextResponse.next() : redirectTo("/admin/login");
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -27,7 +29,7 @@ export async function proxy(request: NextRequest) {
   });
 
   const { data } = await supabase.auth.getUser();
-  if (!data.user && !onLogin) return redirectTo("/admin/login");
+  if (!data.user && !open) return redirectTo("/admin/login");
   if (data.user && onLogin) return redirectTo("/admin/dashboard");
   return response;
 }

@@ -3,8 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { routes, site } from "@/config/site";
 import { capabilities, constructionTypes, processSteps, qualityPoints } from "@/constants/content";
-import { featuredProducts, getProduct, heroProduct, products } from "@/data/products";
-import { reviews } from "@/data/reviews";
+import { heroProduct as bundledHero } from "@/data/products";
+import { getApprovedReviews, getCatalog } from "@/server/catalog";
 import { LiveFootball } from "@/components/3d-viewer/LiveFootball";
 import { Reveal } from "@/components/animations/Reveal";
 import { ButtonLink } from "@/components/buttons/Button";
@@ -23,10 +23,16 @@ export const metadata: Metadata = {
 const textLink =
   "font-semibold underline decoration-red decoration-2 underline-offset-[6px] transition-colors hover:text-red";
 
-export default function HomePage() {
+// Rebuilt at most every five minutes, so published products and approved reviews appear without a redeploy.
+export const revalidate = 300;
+
+export default async function HomePage() {
+  const { products, featured, hero } = await getCatalog();
+  const featuredProducts = featured.length > 0 ? featured : products.slice(0, 6);
+  const reviews = (await getApprovedReviews({ pageSize: 3 })).reviews;
   return (
     <>
-      <HomeHero product={heroProduct} />
+      <HomeHero product={hero ?? bundledHero} />
 
       {/* Company introduction */}
       <section className="section bg-paper">
@@ -88,7 +94,8 @@ export default function HomePage() {
           />
           <ul className="mt-14 grid gap-px overflow-hidden rounded-sm bg-white/15 md:grid-cols-3">
             {constructionTypes.map(({ slug, panels, text }) => {
-              const product = getProduct(slug)!;
+              const product = products.find((p) => p.slug === slug);
+              if (!product) return null;
               return (
                 <li key={slug} className="flex flex-col bg-navy-deep p-6 sm:p-8">
                   <div className="mx-auto w-full max-w-sm">
@@ -228,7 +235,7 @@ export default function HomePage() {
       <section className="section bg-paper">
         <div className="shell">
           <SectionHeading title="What customers say" className="mb-10" />
-          <ReviewList reviews={reviews.slice(0, 3)} />
+          <ReviewList reviews={reviews} />
         </div>
       </section>
 

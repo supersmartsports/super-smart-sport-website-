@@ -1,5 +1,5 @@
 import type { PanelFamily, Product } from "@/types/product";
-import models from "./models.json";
+import models from "./models.json" with { type: "json" };
 
 /**
  * The football collection.

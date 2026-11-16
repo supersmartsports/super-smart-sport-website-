@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { ImagePlus, RotateCcw, X } from "lucide-react";
 import { routes } from "@/config/site";
-import { getProduct, products } from "@/data/products";
+import type { Product } from "@/types/product";
 import {
   brandingOptions,
   colorSwatches,
@@ -113,9 +113,10 @@ function ColorPicker({ label, value, onChange }: { label: string; value: string;
   );
 }
 
-export function DesignStudio() {
+export function DesignStudio({ products }: { products: Product[] }) {
+  const getProduct = (slug: string) => products.find((p) => p.slug === slug);
   const searchParams = useSearchParams();
-  const [slug, setSlug] = useState(products[0].slug);
+  const [slug, setSlug] = useState(products[0]?.slug ?? "");
   const [type, setType] = useState<(typeof typeOptions)[number]>(typeOptions[0]);
   const [size, setSize] = useState<(typeof sizeOptions)[number]>(sizeOptions[0]);
   const [construction, setConstruction] = useState<(typeof constructionOptions)[number]>("Not sure, please advise");
@@ -136,6 +137,7 @@ export function DesignStudio() {
   }, [logo]);
 
   const product = getProduct(slug) ?? products[0];
+  if (!product) return <p className="text-white/75">No footballs are published yet. Please contact us to start your project.</p>;
   const colorsChanged = primary !== originalColors.primary || secondary !== originalColors.secondary;
   const recolor = useMemo(() => (colorsChanged ? { primary, secondary } : null), [colorsChanged, primary, secondary]);
 

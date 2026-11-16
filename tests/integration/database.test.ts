@@ -125,7 +125,7 @@ describe("customers", () => {
 describe("inquiries from the public website", () => {
   it("accepts a valid inquiry from an anonymous visitor and nothing else", async () => {
     const id = await asAnon(db, async () =>
-      (await db.query<{ submit_inquiry: string }>("select submit_inquiry('Ann', 'ann@example.com', null, 'DE', 'FC Test', 'Match football', 500, 'Need logo balls', '{}'::jsonb, 'website')")).rows[0].submit_inquiry,
+      (await db.query<{ submit_inquiry: string }>("select id as submit_inquiry from submit_inquiry_v2('db-test-0001', 'Ann', 'ann@example.com', null, 'DE', 'FC Test', 'Match football', 500, 'Need logo balls', '{}'::jsonb, 'website')")).rows[0].submit_inquiry,
     );
     expect(id).toMatch(/[0-9a-f-]{36}/);
     expect((await asUser(db, sales, () => all("select 1 from inquiries where id = $1", [id]))).length).toBe(1);
@@ -133,7 +133,7 @@ describe("inquiries from the public website", () => {
   });
 
   it("rejects an inquiry with no way to contact the sender", async () => {
-    await rejects(asAnon(db, () => db.query("select submit_inquiry('Bob', null, null, null, null, null, null, null, '{}'::jsonb)")));
+    await rejects(asAnon(db, () => db.query("select * from submit_inquiry_v2('db-test-0002', 'Bob', null, null, null, null, null, null, null, '{}'::jsonb)")));
   });
 
   it("notifies staff who may read inquiries, and only them", async () => {

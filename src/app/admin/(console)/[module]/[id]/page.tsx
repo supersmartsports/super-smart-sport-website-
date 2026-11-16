@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ActionForm, ChildForm, DeleteRowButton, RecordForm } from "@/components/admin/forms";
+import { ActionForm, ChildForm, DeleteRowButton, RecordForm, UploadForm } from "@/components/admin/forms";
 import { Cell, DataTable, formatMoney, getPath } from "@/components/admin/format";
-import { addChildRow, deleteChildRow, runAction, saveRecord } from "@/features/admin/actions";
-import { moduleBySlug } from "@/features/admin/modules";
+import { addChildRow, deleteAttachment, deleteChildRow, runAction, saveRecord, uploadAttachment } from "@/features/admin/actions";
+import { ATTACHMENT_ENTITY, ATTACHMENT_KINDS, moduleBySlug } from "@/features/admin/modules";
 import { hasPermission } from "@/features/auth/permissions";
 import { nextStatuses, ORDER_STATUS_LABELS, orderProgress, type OrderStatus } from "@/features/orders/workflow";
 import { createUserClient } from "@/lib/database/server";
@@ -66,6 +66,14 @@ export default async function RecordPage({ params }: Props) {
   const children = await Promise.all(visibleChildren.map(async (child) => ({ child, rows: (await getChildRows(child, id)).rows, options: await loadRelationOptions(child.fields) })));
   const visibleRelated = (config.related ?? []).filter((related) => hasPermission(user, related.read));
   const related = await Promise.all(visibleRelated.map(async (rel) => ({ rel, rows: (await getRelatedRows(rel, id)).rows })));
+
+  // Files attached to this record, each with a short-lived private download link.
+  const entity = ATTACHMENT_ENTITY[slug];
+  let files: { id: string; file_name: string; kind: string; size_bytes: number; url: string | null }[] = [];
+  if (entity) {
+    const { data: rows } = await supabase.from("attachments").select("id, file_name, kind, size_bytes, storage_path").eq("entity_type", entity).eq("entity_id", id).order("created_at", { ascending: false });
+    files = await Promise.all((rows ?? []).map(async (r) => ({ id: r.id, file_name: r.file_name, kind: r.kind, size_bytes: r.size_bytes, url: (await supabase.storage.from("business-files").createSignedUrl(r.storage_path, 300)).data?.signedUrl ?? null })));
+  }
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -191,6 +199,23 @@ export default async function RecordPage({ params }: Props) {
               </section>
             );
           })}
+
+          {entity && (files.length > 0 || canWrite) && (
+            <section aria-labelledby="files-h" className="mt-8">
+              <h2 id="files-h" className="type-h3">Files</h2>
+              {files.length === 0 ? <p className="mt-3 rounded-sm bg-white p-6 text-slate ring-1 ring-line">No files attached yet.</p> : (
+                <ul className="mt-3 grid gap-2">
+                  {files.map((file) => (
+                    <li key={file.id} className="flex flex-wrap items-center justify-between gap-3 rounded-sm bg-white p-3 text-sm ring-1 ring-line">
+                      <span>{file.url ? <a href={file.url} target="_blank" rel="noopener noreferrer" className="font-bold text-navy underline-offset-4 hover:underline">{file.file_name}</a> : file.file_name}<span className="text-slate"> / {human(file.kind)} / {(file.size_bytes / 1024).toFixed(0)} KB</span></span>
+                      {canWrite && <DeleteRowButton action={deleteAttachment.bind(null, slug, id, file.id)} label={file.file_name} />}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {canWrite && <UploadForm action={uploadAttachment.bind(null, slug, id)} kinds={ATTACHMENT_KINDS} />}
+            </section>
+          )}
 
           {related.map(({ rel, rows }) => (
             <section key={rel.key} aria-labelledby={`r-${rel.key}`} className="mt-8">

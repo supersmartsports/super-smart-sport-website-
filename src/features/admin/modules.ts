@@ -213,14 +213,33 @@ export const MODULES: Record<string, ModuleConfig> = {
   products: {
     slug: "products", label: "Products", singular: "product", table: "products", select: "*", titleKey: "name",
     columns: [{ key: "sku", label: "SKU", link: true }, { key: "name", label: "Name" }, { key: "panel_count", label: "Panels", format: "number" }, { key: "construction", label: "Construction" }, { key: "is_active", label: "Active", format: "boolean" }],
-    search: ["name", "sku", "slug"], order: { column: "name", ascending: true }, read: "products.read", write: "products.write",
+    search: ["name", "sku", "slug"], order: { column: "sort_order", ascending: true }, read: "products.read", write: "products.write",
     fields: [
       { name: "name", label: "Name", type: "text", required: true, max: 200 }, { name: "sku", label: "SKU", type: "text", required: true, max: 60 },
       { name: "slug", label: "URL slug", type: "text", required: true, max: 80, help: "Lowercase letters, numbers and hyphens." },
       { name: "panel_count", label: "Panels", type: "number" }, { name: "construction", label: "Construction", type: "text", max: 100 }, { name: "material", label: "Material", type: "text", max: 100 },
       { name: "description", label: "Description", type: "textarea", max: 2000 }, { name: "model_path", label: "3D model path", type: "text", max: 300 }, { name: "poster_path", label: "Poster image path", type: "text", max: 300 },
-      { name: "is_active", label: "Active", type: "checkbox", default: true },
+      { name: "featured", label: "Show on the homepage", type: "checkbox", default: false },
+      { name: "sort_order", label: "Display order (lowest first)", type: "number", default: 0 },
+      { name: "is_active", label: "Published on the website", type: "checkbox", default: true, help: "Unpublished products are not shown to the public." },
     ],
+  },
+
+  reviews: {
+    slug: "reviews", label: "Reviews", singular: "review", table: "reviews", select: "*, products(name)", titleKey: "customer_name",
+    columns: [
+      { key: "customer_name", label: "Customer", link: true }, { key: "country", label: "Country" }, { key: "products.name", label: "Football" },
+      { key: "rating", label: "Rating", format: "number" }, { key: "status", label: "Status", format: "status" }, { key: "created_at", label: "Received", format: "date" },
+    ],
+    search: ["customer_name", "body"], filters: [filter("status", "Status", "status", ["pending", "approved", "rejected"])],
+    order: { column: "created_at", ascending: false }, read: "reviews.read", write: "reviews.write",
+    fields: [
+      { name: "customer_name", label: "Customer name", type: "text", required: true, max: 120 }, { name: "country", label: "Country", type: "text", max: 100 },
+      { name: "product_id", label: "Football (optional)", type: "relation", relation: { table: "products", label: "name" } },
+      { name: "rating", label: "Rating", type: "select", required: true, options: ["1", "2", "3", "4", "5"].map((v) => ({ value: v, label: v + " of 5" })) },
+      { name: "body", label: "Review", type: "textarea", required: true, max: 2000, help: "Only add a review a real customer has given you permission to publish." },
+    ],
+    actions: [{ type: "status", label: "Set status", column: "status", next: (r) => ["pending", "approved", "rejected"].filter((s) => s !== r.status), permission: "reviews.write" }],
   },
 
   materials: {
@@ -389,3 +408,10 @@ export const moduleBySlug = (slug: string): ModuleConfig | undefined => MODULES[
 export { ORDER_STATUS_LABELS };
 export const statusLabel = (value: string) => human(String(value));
 export type { Child };
+
+/** Which kind of record a module's attached files belong to (the `attachments.entity_type` values). */
+export const ATTACHMENT_ENTITY: Record<string, string> = {
+  customers: "customer", inquiries: "inquiry", quotations: "quotation", orders: "order", production: "batch", quality: "inspection",
+  payments: "payment", invoices: "invoice", expenses: "expense", shipping: "shipment", suppliers: "supplier",
+};
+export const ATTACHMENT_KINDS = ["artwork", "logo", "proof", "receipt", "document", "photo", "other"] as const;

@@ -23,7 +23,9 @@ The service key is only imported by `src/lib/database/admin.ts`, which uses `ser
 
 ## 3. Apply the database migrations
 
-Run the files in `database/migrations` **in order** (0001 to 0011) in the Supabase SQL editor, or with the Supabase CLI
+Run migrations 0001 to 0012. Then load the real football catalogue (name, panel count, 3D model path) with `database/seed/products.sql` (regenerate it with `node scripts/generate-product-seed.mjs` after changing `src/data/products`). Until products exist in the database, the website shows an empty collection once Supabase is connected.
+
+Run the files in `database/migrations` **in order** (0001 to 0012) in the Supabase SQL editor, or with the Supabase CLI
 (`supabase db push`). They create tables, constraints, row level security policies and the standard roles and permissions.
 They contain no business data. Run them on the empty staging project first and confirm there are no errors.
 
@@ -35,8 +37,11 @@ They contain no business data. Run them on the empty staging project first and c
 
 ## 5. Storage
 
-Migration 0008 creates a private `business-files` bucket and its policies when Supabase Storage exists. File upload screens are a
-later stage; until then no files are stored.
+Migration 0008 creates a private `business-files` bucket and its policies when Supabase Storage exists. Staff attach files on each record's page; customers can attach artwork on the quote form (stored by the server with the service key). Only PNG, JPEG, WebP and PDF up to 10 MB are accepted, and the type is checked from the file's bytes.
+
+## 5b. Password reset email
+
+In *Authentication > URL configuration* add `<your site>/admin/auth/callback` to the redirect URLs, and configure an email sender so the reset email can be delivered.
 
 ## 6. Checks before going live
 

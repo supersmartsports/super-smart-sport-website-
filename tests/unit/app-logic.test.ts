@@ -24,8 +24,8 @@ describe("permissions", () => {
     expect(visibleModules({ permissions: [] })).toEqual([]);
   });
 
-  it("lists all 20 modules, each guarded by real permission keys", () => {
-    expect(ADMIN_MODULES).toHaveLength(20);
+  it("lists all 21 modules, each guarded by real permission keys", () => {
+    expect(ADMIN_MODULES).toHaveLength(21);
     for (const module of ADMIN_MODULES) {
       for (const key of module.anyOf) expect(PERMISSION_KEYS).toContain(key);
     }

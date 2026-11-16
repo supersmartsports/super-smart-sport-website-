@@ -1,12 +1,13 @@
 import type { MetadataRoute } from "next";
 import { routes, site } from "@/config/site";
-import { products } from "@/data/products";
+import { getCatalog } from "@/server/catalog";
 
 // Uses the configured domain. Until NEXT_PUBLIC_SITE_URL is set this falls back to
 // the local address, so set it before the site goes live.
 const base = site.url ?? "http://localhost:3000";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const { products } = await getCatalog();
   const pages = [
     routes.home,
     routes.about,

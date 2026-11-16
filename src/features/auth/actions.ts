@@ -44,3 +44,32 @@ export async function signOut() {
   }
   redirect("/admin/login");
 }
+
+export type ResetState = { error?: string; ok?: string };
+
+/** Sends a password reset link. The answer is the same whether or not the address has an account. */
+export async function requestPasswordReset(_prev: ResetState, formData: FormData): Promise<ResetState> {
+  if (!isSupabaseConfigured()) return { error: "Password reset is not set up yet." };
+  const parsed = signInSchema.pick({ email: true }).safeParse({ email: formData.get("email") });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const ip = ((await headers()).get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
+  if (!rateLimit(`reset:${ip}`, 5, WINDOW).allowed || !rateLimit(`reset:${parsed.data.email}`, 3, WINDOW).allowed) return { error: "Too many requests. Wait a few minutes and try again." };
+  const origin = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const supabase = await createUserClient();
+  await supabase.auth.resetPasswordForEmail(parsed.data.email, { redirectTo: `${origin}/admin/auth/callback?next=/admin/reset-password` });
+  return { ok: "If that email belongs to a staff account, a reset link is on its way." };
+}
+
+/** Sets a new password for the person who followed the reset link (they are signed in by the link). */
+export async function updatePassword(_prev: ResetState, formData: FormData): Promise<ResetState> {
+  if (!isSupabaseConfigured()) return { error: "Password reset is not set up yet." };
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 12) return { error: "Use at least 12 characters." };
+  if (password !== String(formData.get("confirm") ?? "")) return { error: "The two passwords do not match." };
+  const supabase = await createUserClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) return { error: "This reset link has expired. Request a new one." };
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: "The password could not be changed. Choose a different one." };
+  redirect("/admin/dashboard");
+}

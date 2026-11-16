@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { routes, site } from "@/config/site";
-import { products } from "@/data/products";
+import { getCatalog } from "@/server/catalog";
 import { ButtonLink } from "@/components/buttons/Button";
 import { PageHero } from "@/components/layout/PageHero";
 import { QuoteCta } from "@/components/layout/QuoteCta";
@@ -35,7 +35,10 @@ const sections = [
   },
 ];
 
-export default function AboutPage() {
+export const revalidate = 300;
+
+export default async function AboutPage() {
+  const { products } = await getCatalog();
   return (
     <>
       <PageHero
