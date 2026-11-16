@@ -125,10 +125,25 @@ export function FootballViewer({
       return;
     }
     let cancelled = false;
-    const arm = () => {
+    const start = () => {
       if (cancelled) return;
       if ("requestIdleCallback" in window) window.requestIdleCallback(() => !cancelled && setArmed(true), { timeout: 1500 });
       else setTimeout(() => !cancelled && setArmed(true), 300);
+    };
+    // Wait until the still image is loaded, decoded and painted: the 3D start is heavy and must not
+    // get in front of the first view of the football.
+    const arm = () => {
+      const poster = container.current?.querySelector("img");
+      const posterReady =
+        !poster || poster.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              poster.addEventListener("load", () => resolve(), { once: true });
+              poster.addEventListener("error", () => resolve(), { once: true });
+            });
+      posterReady
+        .then(() => poster?.decode?.().catch(() => undefined))
+        .then(() => requestAnimationFrame(() => requestAnimationFrame(start)));
     };
     if (document.readyState === "complete") arm();
     else window.addEventListener("load", arm, { once: true });
