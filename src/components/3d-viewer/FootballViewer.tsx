@@ -22,13 +22,14 @@ import type { Anchor, Recolor, RotationState } from "./FootballScene";
 // Three.js is only downloaded when a viewer is actually shown.
 const FootballScene = dynamic(() => import("./FootballScene"), { ssr: false });
 
-class SceneBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
+class SceneBoundary extends Component<{ onError: (reason: string) => void; children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
   }
-  componentDidCatch() {
-    this.props.onError();
+  componentDidCatch(error: unknown) {
+    console.warn("[3D viewer] could not start:", error);
+    this.props.onError(error instanceof Error ? error.message : String(error));
   }
   render() {
     return this.state.failed ? null : this.props.children;
@@ -39,7 +40,7 @@ let webglSupport: boolean | null = null;
 
 /** Checked once, and the test context is released straight away: browsers allow only a limited number of live WebGL contexts. */
 function supportsWebGL() {
-  if (webglSupport !== null) return webglSupport;
+  if (webglSupport === true) return true;
   try {
     const canvas = document.createElement("canvas");
     const gl = (canvas.getContext("webgl2") ?? canvas.getContext("webgl")) as WebGLRenderingContext | null;
@@ -48,7 +49,7 @@ function supportsWebGL() {
   } catch {
     webglSupport = false;
   }
-  return webglSupport;
+  return webglSupport === true;
 }
 
 export type FootballViewerProps = {
@@ -162,7 +163,9 @@ export function FootballViewer({
   const handleReady = useCallback(() => setStatus("ready"), []);
   // A failed or lost 3D context is retried a couple of times before falling back to the still image for good.
   const [attempt, setAttempt] = useState(0);
-  const handleError = useCallback(() => {
+  const reason = useRef("");
+  const handleError = useCallback((why?: string) => {
+    if (why) reason.current = why;
     setAttempt((current) => {
       if (current < 2) {
         setTimeout(() => setStatus("loading"), 0);
@@ -238,9 +241,10 @@ export function FootballViewer({
                 autoRotateSpeed={autoRotate && !reducedMotion ? 0.5 : 0}
                 active={onScreen}
                 shadow={shadow === "contact"}
-                lowPower={lowPower}
+                lowPower={lowPower || attempt > 0}
                 onReady={handleReady}
-                onContextLost={handleError}
+                onContextLost={() => handleError("The browser removed the 3D context")}
+                fallbackLighting={attempt > 0}
               />
             </Suspense>
           </SceneBoundary>
@@ -281,8 +285,9 @@ export function FootballViewer({
 
         <p
           aria-live="polite"
+          data-reason={status === "unavailable" ? reason.current : undefined}
           className={`pointer-events-none absolute inset-x-0 bottom-1 text-center text-xs ${statusColor} transition-opacity duration-500 ${
-            status === "loading" || status === "unavailable" ? "opacity-100" : "opacity-0"
+            status === "loading" || (status === "unavailable" && eager) ? "opacity-100" : "opacity-0"
           }`}
         >
           {status === "loading" && "Loading 3D model"}

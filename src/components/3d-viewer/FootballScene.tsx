@@ -58,6 +58,8 @@ export type FootballSceneProps = {
   /** Keeps the frame readable for image export. Off in normal use. */
   preserveDrawingBuffer?: boolean;
   onReady?: () => void;
+  /** Light the ball with plain lights instead of the studio environment, for graphics hardware that cannot build it. */
+  fallbackLighting?: boolean;
   /** Called if the browser takes the 3D context away (for example too many canvases are open). */
   onContextLost?: () => void;
 };
@@ -454,6 +456,17 @@ function ResumeLoop({ active }: { active: boolean }) {
   return null;
 }
 
+/** Simple lighting that needs no special graphics features. Less refined than the studio set, but it always works. */
+function PlainLighting() {
+  return (
+    <>
+      <hemisphereLight args={["#ffffff", "#8f93b8", 1.4]} />
+      <directionalLight position={[3, 5, 4]} intensity={2.2} />
+      <directionalLight position={[-4, 2, -3]} intensity={0.9} />
+    </>
+  );
+}
+
 /** Soft-box studio lighting built in code, so no HDR file has to be downloaded. */
 function StudioLighting() {
   return (
@@ -487,13 +500,17 @@ export default function FootballScene({
   shadow = true,
   lowPower = false,
   preserveDrawingBuffer = false,
+  fallbackLighting = false,
   onReady,
   onContextLost,
 }: FootballSceneProps) {
+  // A very large canvas on a high-density screen can exceed what a modest graphics card allows,
+  // so keep the drawing buffer to roughly 1500 pixels across however large the canvas is.
+  const maxDpr = frame > 1 && typeof window !== "undefined" ? Math.min(1.5, Math.max(0.75, 1500 / (frame * 0.7 * window.innerHeight))) : lowPower ? 1.5 : 2;
   return (
     <Canvas
       frameloop={active ? "always" : "never"}
-      dpr={[1, frame > 1 ? 1.5 : lowPower ? 1.5 : 2]}
+      dpr={[Math.min(1, maxDpr), maxDpr]}
       camera={{ fov: 26, position: [0, 0, 5.6 * frame], near: 0.1, far: 30 * frame }}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance", preserveDrawingBuffer }}
       onCreated={({ gl }) => {
@@ -507,7 +524,7 @@ export default function FootballScene({
       style={{ touchAction: "pan-y" }}
     >
       <ResumeLoop active={active} />
-      <StudioLighting />
+      {fallbackLighting ? <PlainLighting /> : <StudioLighting />}
       <Football
         modelUrl={modelUrl}
         recolor={recolor}
